@@ -5,7 +5,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { LoginDto } from './dto/login-user.dto';
 import { AuthGuard } from '@nestjs/passport'; 
 
-@UseGuards(AuthGuard('jwt'))
+
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
@@ -15,6 +15,7 @@ export class UserController {
     return this.userService.create(createUserDto);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Get("all")
   findAll() {
     return this.userService.findAll();
