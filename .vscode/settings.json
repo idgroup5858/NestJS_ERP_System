@@ -1,0 +1,39 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "tsconfig.build.json": true,
+        "README.md": true,
+        "nest-cli.json": true,
+        "eslint.config.mjs": true,
+        "tsconfig.json": true,
+        ".prettierrc": true,
+        ".gitignore": true,
+        "test": true,
+        "src/app.controller.spec.ts": true,
+        "node_modules": true,
+        "dist": true,
+        ".vscode": true,
+        "src/user/user.controller.spec.ts": true,
+        "src/user/user.service.spec.ts": true
+    },
+    "hide-files.files": [
+        "tsconfig.build.json",
+        "README.md",
+        "nest-cli.json",
+        "eslint.config.mjs",
+        "tsconfig.json",
+        ".prettierrc",
+        ".gitignore",
+        "test",
+        "src/app.controller.spec.ts",
+        "node_modules",
+        "dist",
+        ".vscode",
+        "src/user/user.controller.spec.ts",
+        "src/user/user.service.spec.ts"
+    ]
+}
