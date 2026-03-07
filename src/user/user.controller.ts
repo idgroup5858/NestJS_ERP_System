@@ -20,6 +20,7 @@ export class UserController {
   findAll() {
     return this.userService.findAll();
   }
+  
   @Get("allpag")
   findAllPag(
     @Query("page") page:string,

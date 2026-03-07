@@ -25,6 +25,9 @@ export class User {
     @Column()
     role: string;
 
+    @Column({default:null})
+    imgUrl: string;
+
     @CreateDateColumn()
     createdAt: Date;
 }

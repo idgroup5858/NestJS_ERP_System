@@ -18,7 +18,13 @@
         "dist": true,
         ".vscode": true,
         "src/user/user.controller.spec.ts": true,
-        "src/user/user.service.spec.ts": true
+        "src/user/user.service.spec.ts": true,
+        "src/warehouse/warehouse.controller.spec.ts": true,
+        "src/warehouse/warehouse.service.spec.ts": true,
+        "src/customer/customer.controller.spec.ts": true,
+        "src/customer/customer.service.spec.ts": true,
+        "src/product/product.controller.spec.ts": true,
+        "src/product/product.service.spec.ts": true
     },
     "hide-files.files": [
         "tsconfig.build.json",
@@ -34,6 +40,12 @@
         "dist",
         ".vscode",
         "src/user/user.controller.spec.ts",
-        "src/user/user.service.spec.ts"
+        "src/user/user.service.spec.ts",
+        "src/warehouse/warehouse.controller.spec.ts",
+        "src/warehouse/warehouse.service.spec.ts",
+        "src/customer/customer.controller.spec.ts",
+        "src/customer/customer.service.spec.ts",
+        "src/product/product.controller.spec.ts",
+        "src/product/product.service.spec.ts"
     ]
 }

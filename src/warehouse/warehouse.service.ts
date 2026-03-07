@@ -1,26 +1,63 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Warehouse } from './entities/warehouse.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class WarehouseService {
-  create(createWarehouseDto: CreateWarehouseDto) {
-    return 'This action adds a new warehouse';
-  }
 
-  findAll() {
-    return `This action returns all warehouse`;
-  }
 
-  findOne(id: number) {
-    return `This action returns a #${id} warehouse`;
-  }
+  constructor(
+    @InjectRepository(Warehouse)
+    private readonly wareHouseRepository:Repository<Warehouse>
+  ){}
 
-  update(id: number, updateWarehouseDto: UpdateWarehouseDto) {
-    return `This action updates a #${id} warehouse`;
-  }
 
-  remove(id: number) {
-    return `This action removes a #${id} warehouse`;
-  }
+   async create(createWareohouseDto: CreateWarehouseDto) {
+      const warehouse = this.wareHouseRepository.create(createWareohouseDto)
+  
+      await this.wareHouseRepository.save(warehouse);
+      return warehouse;
+    }
+  
+    async findAll() {
+  
+      return this.wareHouseRepository.find();
+    }
+  
+    
+    async findOne(id: number) {
+  
+      const checkWareHouse = await this.wareHouseRepository.findOneBy({ id });
+      if (!checkWareHouse) throw new NotFoundException("Не найден Склад");
+  
+      return checkWareHouse;
+    }
+  
+    async update(id: number, updateWarehouseDto: UpdateWarehouseDto) {
+      const checkWareHouse = await this.wareHouseRepository.findOneBy({ id });
+      if (!checkWareHouse) throw new NotFoundException("Не найден Склад");
+  
+  
+  
+      const warehouse = await this.wareHouseRepository.preload({
+        id,
+        ...updateWarehouseDto
+      });
+  
+      if (!warehouse) throw new NotFoundException()
+  
+      await this.wareHouseRepository.save(warehouse)
+  
+      return warehouse;
+    }
+  
+    async remove(id: number) {
+      const checkWareHouse = await this.wareHouseRepository.findOneBy({ id });
+      if (!checkWareHouse) throw new NotFoundException("Не найден Склад");
+      await this.wareHouseRepository.remove(checkWareHouse)
+      return { message: "Клиент удален" };
+    }
 }

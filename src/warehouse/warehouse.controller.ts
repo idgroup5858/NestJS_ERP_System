@@ -7,27 +7,27 @@ import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
 export class WarehouseController {
   constructor(private readonly warehouseService: WarehouseService) {}
 
-  @Post()
+  @Post("add")
   create(@Body() createWarehouseDto: CreateWarehouseDto) {
     return this.warehouseService.create(createWarehouseDto);
   }
 
-  @Get()
+  @Get("all")
   findAll() {
     return this.warehouseService.findAll();
   }
 
-  @Get(':id')
+  @Get('getby/:id')
   findOne(@Param('id') id: string) {
     return this.warehouseService.findOne(+id);
   }
 
-  @Patch(':id')
+  @Patch('update/:id')
   update(@Param('id') id: string, @Body() updateWarehouseDto: UpdateWarehouseDto) {
     return this.warehouseService.update(+id, updateWarehouseDto);
   }
 
-  @Delete(':id')
+  @Delete('delete/:id')
   remove(@Param('id') id: string) {
     return this.warehouseService.remove(+id);
   }
