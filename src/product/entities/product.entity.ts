@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Category } from "src/category/entities/category.entity";
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 
 
 @Entity()
@@ -21,13 +22,15 @@ export class Product {
     @Column()
     buyPrice:number;
     @Column()
-    category:string;
-    @Column()
     unit:string;
     @Column({nullable:true})
     stock:number;
     @CreateDateColumn()
-    date:Date
+    date:Date;
+
+
+    @ManyToOne(() => Category, category => category.products,{onDelete:"CASCADE"})
+    category:Category;
 
 
 }

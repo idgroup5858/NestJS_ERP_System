@@ -4,6 +4,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { Repository } from 'typeorm';
+import { Category } from 'src/category/entities/category.entity';
 
 @Injectable()
 export class ProductService {
@@ -17,8 +18,13 @@ export class ProductService {
 
 
 
-  async create(createWareohouseDto: CreateProductDto) {
-    const product = this.productRepository.create(createWareohouseDto)
+  async create(createProductDto: CreateProductDto) {
+    const product = this.productRepository.create(
+      {
+        ...createProductDto,
+      category:{id:createProductDto.categoryId}
+      }
+    )
 
     await this.productRepository.save(product);
     return product;
@@ -28,6 +34,7 @@ export class ProductService {
 
     return this.productRepository.find();
   }
+  
 
   async findAllPag(page:number,limit:number) {
 
@@ -58,13 +65,16 @@ export class ProductService {
 
   async findOne(id: number) {
 
-    const checkProduct = await this.productRepository.findOneBy({ id });
+    const checkProduct = await this.productRepository.findOne({ 
+      where:{id},
+      relations:["category"]
+     });
     if (!checkProduct) throw new NotFoundException("Не найден Продукт");
 
     return checkProduct;
   }
 
-  async update(id: number, UpdateProductDto: UpdateProductDto) {
+  async update(id: number, updateProductDto: UpdateProductDto) {
     const checkProduct = await this.productRepository.findOneBy({ id });
     if (!checkProduct) throw new NotFoundException("Не найден Продукт");
 
@@ -72,7 +82,7 @@ export class ProductService {
 
     const product = await this.productRepository.preload({
       id,
-      ...UpdateProductDto
+      ...updateProductDto
     });
 
     if (!product) throw new NotFoundException()

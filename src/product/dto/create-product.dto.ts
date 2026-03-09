@@ -1,4 +1,5 @@
 import { IsNumber, IsOptional, IsString } from "class-validator";
+import { Category } from "src/category/entities/category.entity";
 
 export class CreateProductDto {
 
@@ -17,8 +18,8 @@ export class CreateProductDto {
         bulkPrice:number;
         @IsNumber()
         buyPrice:number;
-        @IsString()
-        category:string;
+        @IsNumber()
+        categoryId:number;
         @IsString()
         unit:string;
 }

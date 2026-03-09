@@ -1,26 +1,91 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateSaleItemDto } from './dto/create-sale_item.dto';
 import { UpdateSaleItemDto } from './dto/update-sale_item.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { SaleItem } from './entities/sale_item.entity';
 
 @Injectable()
 export class SaleItemsService {
-  create(createSaleItemDto: CreateSaleItemDto) {
-    return 'This action adds a new saleItem';
-  }
-
-  findAll() {
-    return `This action returns all saleItems`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} saleItem`;
-  }
-
-  update(id: number, updateSaleItemDto: UpdateSaleItemDto) {
-    return `This action updates a #${id} saleItem`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} saleItem`;
-  }
+  
+    constructor(
+      @InjectRepository(SaleItem)
+      private readonly saleItemRepository: Repository<SaleItem>
+    ) { }
+  
+  
+  
+  
+    async create(createSaleItemDto: CreateSaleItemDto) {
+      const sale_item = this.saleItemRepository.create(createSaleItemDto)
+  
+      await this.saleItemRepository.save(sale_item);
+      return sale_item;
+    }
+  
+    async findAll() {
+  
+      return this.saleItemRepository.find();
+    }
+    
+  
+    async findAllPag(page:number,limit:number) {
+  
+      page = page > 0 ? page : 1;
+      limit = limit > 0 ? limit : 10;
+  
+      const skip = (page - 1) * limit;
+  
+      const [data, total] = await this.saleItemRepository.findAndCount({
+        skip,
+        take: limit,
+        order: { id: 'DESC' }, // ixtiyoriy
+      });
+  
+      return {
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        data
+      };
+  
+      
+    }
+  
+  
+    async findOne(id: number) {
+  
+      const checkSaleItem = await this.saleItemRepository.findOneBy({ id });
+      if (!checkSaleItem) throw new NotFoundException("Не найден Продукт");
+  
+      return checkSaleItem;
+    }
+  
+    async update(id: number, updateSaleItemDto: UpdateSaleItemDto) {
+      const checkSaleItem = await this.saleItemRepository.findOneBy({ id });
+      if (!checkSaleItem) throw new NotFoundException("Не найден Продукт");
+  
+  
+      const sale_item = await this.saleItemRepository.preload({
+        id,
+        ...updateSaleItemDto
+      });
+  
+      if (!sale_item) throw new NotFoundException()
+  
+      await this.saleItemRepository.save(sale_item)
+  
+      return sale_item;
+    }
+  
+    async remove(id: number) {
+      const checkSaleItem = await this.saleItemRepository.findOneBy({ id });
+      if (!checkSaleItem) throw new NotFoundException("Не найден Продукт");
+      await this.saleItemRepository.remove(checkSaleItem)
+      return { message: "Продукт удален" }
+  
+    }
 }

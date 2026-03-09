@@ -11,6 +11,7 @@ import { PaymentModule } from './payment/payment.module';
 import { SaleItemsModule } from './sale_items/sale_items.module';
 import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
+import { CategoryModule } from './category/category.module';
 
 @Module({
   imports: [CustomerModule, UserModule, WarehouseModule, ProductModule, SaleModule, StockModule, PaymentModule, SaleItemsModule, DatabaseModule,
@@ -18,6 +19,7 @@ import { ConfigModule } from '@nestjs/config';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    CategoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

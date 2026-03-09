@@ -24,7 +24,17 @@
         "src/customer/customer.controller.spec.ts": true,
         "src/customer/customer.service.spec.ts": true,
         "src/product/product.controller.spec.ts": true,
-        "src/product/product.service.spec.ts": true
+        "src/product/product.service.spec.ts": true,
+        "package.json": true,
+        "package-lock.json": true,
+        "src/category/category.controller.spec.ts": true,
+        "src/category/category.service.spec.ts": true,
+        "src/sale_items/sale_items.controller.spec.ts": true,
+        "src/sale_items/sale_items.service.spec.ts": true,
+        "src/stock/stock.controller.spec.ts": true,
+        "src/stock/stock.service.spec.ts": true,
+        "src/sale/sale.service.spec.ts": true,
+        "src/sale/sale.controller.spec.ts": true
     },
     "hide-files.files": [
         "tsconfig.build.json",
@@ -46,6 +56,16 @@
         "src/customer/customer.controller.spec.ts",
         "src/customer/customer.service.spec.ts",
         "src/product/product.controller.spec.ts",
-        "src/product/product.service.spec.ts"
+        "src/product/product.service.spec.ts",
+        "package.json",
+        "package-lock.json",
+        "src/category/category.controller.spec.ts",
+        "src/category/category.service.spec.ts",
+        "src/sale_items/sale_items.controller.spec.ts",
+        "src/sale_items/sale_items.service.spec.ts",
+        "src/stock/stock.controller.spec.ts",
+        "src/stock/stock.service.spec.ts",
+        "src/sale/sale.service.spec.ts",
+        "src/sale/sale.controller.spec.ts"
     ]
 }
