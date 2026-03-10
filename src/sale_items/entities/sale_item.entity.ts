@@ -1,4 +1,7 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Product } from "src/product/entities/product.entity";
+import { Sale } from "src/sale/entities/sale.entity";
+import { Warehouse } from "src/warehouse/entities/warehouse.entity";
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 
 
 
@@ -6,14 +9,23 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeor
 export class SaleItem {
 
         @PrimaryGeneratedColumn()
-        id:number;
+        id: number;
+
+
+        @ManyToOne(() => Sale, sale => sale.items)
+        sale: Sale;
+
+        @ManyToOne(() => Product)
+        product: Product;
+
+        @ManyToOne(() => Warehouse)
+        warehouse: Warehouse;
+
         @Column()
-        product_id:number;
+        quantity: number;
+
         @Column()
-        quantity:number;
-        @Column()
-        price:number;
-        @CreateDateColumn()
-        date:Date;
+        price: number;
+        date: Date;
 
 }

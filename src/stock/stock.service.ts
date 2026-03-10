@@ -17,8 +17,12 @@ export class StockService {
     
     
     
-      async create(sreateStockDto: CreateStockDto) {
-        const stock = this.stocRepository.create(sreateStockDto)
+      async create(createStockDto: CreateStockDto) {
+        const stock = this.stocRepository.create({
+          quantity:createStockDto.quantity,
+          product:{id:createStockDto.product_id},
+          warehouse:{id:createStockDto.warehouse_id}
+        })
     
         await this.stocRepository.save(stock);
         return stock;
@@ -26,7 +30,9 @@ export class StockService {
     
       async findAll() {
     
-        return this.stocRepository.find();
+        return this.stocRepository.find({
+          relations:["product","warehouse"]
+        });
       }
       
     

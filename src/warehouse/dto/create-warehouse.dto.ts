@@ -1,4 +1,4 @@
-import { IsString } from "class-validator";
+import { IsNumber, IsString } from "class-validator";
 
 export class CreateWarehouseDto {
 
@@ -6,9 +6,7 @@ export class CreateWarehouseDto {
         @IsString()
         name:string;
     
-        @IsString()
-        weight:string;
+        @IsNumber()
+        weight:number;
     
-        @IsString()
-        stock:string;
 }

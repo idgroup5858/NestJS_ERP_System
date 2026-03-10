@@ -17,7 +17,12 @@ export class SaleItemsService {
   
   
     async create(createSaleItemDto: CreateSaleItemDto) {
-      const sale_item = this.saleItemRepository.create(createSaleItemDto)
+      const sale_item = this.saleItemRepository.create({
+        ...createSaleItemDto,
+       sale:{id:createSaleItemDto.sale_id},
+       product:{id:createSaleItemDto.product_id},
+       warehouse:{id:createSaleItemDto.warehouse_id}
+      })
   
       await this.saleItemRepository.save(sale_item);
       return sale_item;

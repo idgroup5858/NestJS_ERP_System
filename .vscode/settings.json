@@ -34,7 +34,9 @@
         "src/stock/stock.controller.spec.ts": true,
         "src/stock/stock.service.spec.ts": true,
         "src/sale/sale.service.spec.ts": true,
-        "src/sale/sale.controller.spec.ts": true
+        "src/sale/sale.controller.spec.ts": true,
+        "src/payment/payment.controller.spec.ts": true,
+        "src/payment/payment.service.spec.ts": true
     },
     "hide-files.files": [
         "tsconfig.build.json",
@@ -66,6 +68,8 @@
         "src/stock/stock.controller.spec.ts",
         "src/stock/stock.service.spec.ts",
         "src/sale/sale.service.spec.ts",
-        "src/sale/sale.controller.spec.ts"
+        "src/sale/sale.controller.spec.ts",
+        "src/payment/payment.controller.spec.ts",
+        "src/payment/payment.service.spec.ts"
     ]
 }

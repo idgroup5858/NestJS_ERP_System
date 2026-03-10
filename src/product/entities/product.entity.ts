@@ -1,5 +1,6 @@
 import { Category } from "src/category/entities/category.entity";
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Stock } from "src/stock/entities/stock.entity";
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
 @Entity()
@@ -23,14 +24,18 @@ export class Product {
     buyPrice:number;
     @Column()
     unit:string;
-    @Column({nullable:true})
-    stock:number;
+    
     @CreateDateColumn()
     date:Date;
 
 
     @ManyToOne(() => Category, category => category.products,{onDelete:"CASCADE"})
     category:Category;
+
+    
+
+    @OneToMany(() => Stock, stock => stock.product)
+    stock:Stock[]
 
 
 }

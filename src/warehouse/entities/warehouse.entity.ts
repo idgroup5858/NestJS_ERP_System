@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Stock } from "src/stock/entities/stock.entity";
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
 
@@ -13,13 +14,18 @@ export class Warehouse {
     name:string;
 
     @Column()
-    weight:string;
+    weight:number;
 
-    @Column()
-    stock:string;
+    // @Column()
+    // stock:string;
 
     @CreateDateColumn()
     date:Date;
+
+
+
+    @OneToMany(() => Stock, stock => stock.warehouse)
+    stock:Stock[];
 
 
 }

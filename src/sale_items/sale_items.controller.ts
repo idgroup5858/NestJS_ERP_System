@@ -3,11 +3,11 @@ import { SaleItemsService } from './sale_items.service';
 import { CreateSaleItemDto } from './dto/create-sale_item.dto';
 import { UpdateSaleItemDto } from './dto/update-sale_item.dto';
 
-@Controller('sale-items')
+@Controller('saleitems')
 export class SaleItemsController {
   constructor(private readonly saleItemsService: SaleItemsService) {}
 
-  @Post()
+  @Post("add")
   create(@Body() createSaleItemDto: CreateSaleItemDto) {
     return this.saleItemsService.create(createSaleItemDto);
   }

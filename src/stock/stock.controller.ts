@@ -7,27 +7,27 @@ import { UpdateStockDto } from './dto/update-stock.dto';
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 
-  @Post()
+  @Post("add")
   create(@Body() createStockDto: CreateStockDto) {
     return this.stockService.create(createStockDto);
   }
 
-  @Get()
+  @Get("all")
   findAll() {
     return this.stockService.findAll();
   }
 
-  @Get(':id')
+  @Get('getby/:id')
   findOne(@Param('id') id: string) {
     return this.stockService.findOne(+id);
   }
 
-  @Patch(':id')
+  @Patch('update/:id')
   update(@Param('id') id: string, @Body() updateStockDto: UpdateStockDto) {
     return this.stockService.update(+id, updateStockDto);
   }
 
-  @Delete(':id')
+  @Delete('delete/:id')
   remove(@Param('id') id: string) {
     return this.stockService.remove(+id);
   }

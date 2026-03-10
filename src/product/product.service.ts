@@ -32,7 +32,7 @@ export class ProductService {
 
   async findAll() {
 
-    return this.productRepository.find();
+    return this.productRepository.find({relations:['category',"stock","stock.warehouse"]});
   }
   
 
@@ -47,6 +47,7 @@ export class ProductService {
       skip,
       take: limit,
       order: { id: 'DESC' }, // ixtiyoriy
+      relations:["category"]
     });
 
     return {
