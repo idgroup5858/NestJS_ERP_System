@@ -12,7 +12,7 @@ export class SaleItemsController {
     return this.saleItemsService.create(createSaleItemDto);
   }
 
-  @Get()
+  @Get("all")
   findAll() {
     return this.saleItemsService.findAll();
   }

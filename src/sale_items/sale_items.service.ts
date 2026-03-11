@@ -30,7 +30,9 @@ export class SaleItemsService {
   
     async findAll() {
   
-      return this.saleItemRepository.find();
+      return this.saleItemRepository.find({
+        relations:["sale","product","warehouse"]
+      });
     }
     
   

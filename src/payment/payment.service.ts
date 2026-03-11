@@ -6,7 +6,7 @@ import { Repository } from 'typeorm';
 import { Payment } from './entities/payment.entity';
 
 @Injectable()
-export class PaymentService {
+export class  PaymentService {
 
 
 
@@ -32,7 +32,7 @@ export class PaymentService {
 
   async findAll() {
 
-    return this.paymentRepository.find();
+    return this.paymentRepository.find({relations:["sale","sale.items","sale.items.product","sale.payments"]});
   }
 
 
@@ -47,6 +47,7 @@ export class PaymentService {
       skip,
       take: limit,
       order: { id: 'DESC' }, // ixtiyoriy
+      relations:["sale","sale.items","sale.items.product","sale.payments"]
     });
 
     return {

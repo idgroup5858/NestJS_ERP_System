@@ -17,6 +17,9 @@ export class Sale {
     @OneToMany(() => Payment, payment => payment.sale, { cascade: true })
     payments: Payment[];
 
+    @Column({ type: 'decimal', default: 0 })
+    total: number;
+
     @CreateDateColumn()
     date: Date
 
