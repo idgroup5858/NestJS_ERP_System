@@ -15,82 +15,74 @@ export class SaleService {
     private readonly saleRepository: Repository<Sale>,
     private readonly saleItemsService: SaleItemsService,
     private readonly paymentService: PaymentService
-    
+
   ) { }
 
 
-async createFullSale(createSaleDto: CreateSaleDto) {
 
-  let total = 0;
+// async createFullSale(createSaleDto: CreateSaleDto) {
 
-  for (const item of createSaleDto.items) {
-    total += item.quantity * item.price;
-  }
+//   let total = 0;
 
-  const sale = this.saleRepository.create({
-    total
-  });
+//   for (const item of createSaleDto.items) {
+//     total += item.quantity * item.price;
+//   }
 
-  await this.saleRepository.save(sale);
+//   const sale = this.saleRepository.create({
+//     customer: { id: createSaleDto.customer_id },
+//     user: { id: createSaleDto.user_id },
+//     total,
+//     items: createSaleDto.items,
+//     payments: createSaleDto.payments
+//   });
 
-  for (const item of createSaleDto.items) {
-    await this.saleItemsService.create({
-      ...item,
-      sale_id: sale.id
-    });
-  }
-
-  for (const payment of createSaleDto.payments) {
-    await this.paymentService.create({
-      ...payment,
-      sale_id: sale.id
-    });
-  }
-
-     //return this.findOne(sale.id);
-      return this.saleRepository.findOne({
-        where: { id: sale.id },
-        relations: ['items', 'payments']
-    });
-}
-
-
-//   async createFullSale(createSaleDto: CreateSaleDto) {
-//     // 1. Sale yaratish
-//     const sale = this.saleRepository.create({
-//         ...createSaleDto,
-//         items: [],      // bo‘sh array boshlash
-//         payments: []
-//     });
-//     await this.saleRepository.save(sale);
-
-//     // 2. Sale items yaratish
-//     for (const itemDto of createSaleDto.items) {
-//         await this.saleItemsService.create({
-//             ...itemDto,
-//             sale_id: sale.id
-//         });
-//     }
-
-//     // 3. Payments yaratish
-//     for (const paymentDto of createSaleDto.payments) {
-//         await this.paymentService.create({
-//             ...paymentDto,
-//             sale_id: sale.id
-//         });
-//     }
-
-//     // 4. Yakuniy sale ni qaytarish
-//     return this.saleRepository.findOne({
-//         where: { id: sale.id },
-//         relations: ['items', 'payments']
-//     });
+//   return await this.saleRepository.save(sale);
 // }
+
+
+  async createFullSale(createSaleDto: CreateSaleDto) {
+
+    let total = 0;
+
+    for (const item of createSaleDto.items) {
+      total += item.quantity * item.price;
+    }
+
+    const sale = this.saleRepository.create({
+      customer:{id:createSaleDto.customer_id},
+      user:{id:createSaleDto.user_id},
+      total
+    });
+
+    await this.saleRepository.save(sale);
+
+    for (const item of createSaleDto.items) {
+      await this.saleItemsService.create({
+        ...item,
+        sale_id: sale.id
+      });
+    }
+
+    for (const payment of createSaleDto.payments) {
+      await this.paymentService.create({
+        ...payment,
+        sale_id: sale.id
+      });
+    }
+
+       //return this.findOne(sale.id);
+        return this.saleRepository.findOne({
+          where: { id: sale.id },
+          relations: ['items', 'payments']
+      });
+  }
+
+
 
 
   async findAll() {
 
-    return this.saleRepository.find({relations:["items","payments","items.product"]});
+    return this.saleRepository.find({ relations: ["items", "payments", "items.product","customer","user"] });
   }
 
 
@@ -131,22 +123,22 @@ async createFullSale(createSaleDto: CreateSaleDto) {
 
   async update(id: number, updateSaleDto: UpdateSaleDto) {
 
-  const checkSale = await this.saleRepository.findOneBy({ id });
-  if (!checkSale) throw new NotFoundException("Sale topilmadi");
+    const checkSale = await this.saleRepository.findOneBy({ id });
+    if (!checkSale) throw new NotFoundException("Sale topilmadi");
 
-  const { items, payments, ...saleData } = updateSaleDto;
+    const { items, payments, ...saleData } = updateSaleDto;
 
-  const sale = await this.saleRepository.preload({
-    id,
-    ...saleData
-  });
+    const sale = await this.saleRepository.preload({
+      id,
+      ...saleData
+    });
 
-  if (!sale) throw new NotFoundException();
+    if (!sale) throw new NotFoundException();
 
-  await this.saleRepository.save(sale);
+    await this.saleRepository.save(sale);
 
-  return sale;
-}
+    return sale;
+  }
 
   async remove(id: number) {
     const checkSale = await this.saleRepository.findOneBy({ id });

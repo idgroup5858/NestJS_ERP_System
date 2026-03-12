@@ -1,6 +1,8 @@
+import { Customer } from "src/customer/entities/customer.entity";
 import { Payment } from "src/payment/entities/payment.entity";
 import { SaleItem } from "src/sale_items/entities/sale_item.entity";
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { User } from "src/user/entities/user.entity";
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
 
@@ -16,6 +18,13 @@ export class Sale {
 
     @OneToMany(() => Payment, payment => payment.sale, { cascade: true })
     payments: Payment[];
+
+
+    @ManyToOne(() => Customer, customer => customer.sale)
+    customer:Customer;
+
+    @ManyToOne(() => User, user => user.sale)
+    user:User;
 
     @Column({ type: 'decimal', default: 0 })
     total: number;

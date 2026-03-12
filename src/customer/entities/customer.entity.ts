@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Sale } from "src/sale/entities/sale.entity";
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
 @Entity("customer")
@@ -27,7 +28,11 @@ export class Customer {
     
         @Column({default:null})
         owner: string;
-    
+
+
+        @OneToMany(() => Sale, sale => sale.customer)
+        sale:Sale[]
+
         @CreateDateColumn()
         createdAt: Date;
 

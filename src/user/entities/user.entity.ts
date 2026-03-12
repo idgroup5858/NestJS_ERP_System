@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Sale } from "src/sale/entities/sale.entity";
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
 @Entity("user")
@@ -27,6 +28,9 @@ export class User {
 
     @Column({default:null})
     imgUrl: string;
+
+    @OneToMany(() => Sale, sale => sale.user)
+    sale:Sale[];
 
     @CreateDateColumn()
     createdAt: Date;

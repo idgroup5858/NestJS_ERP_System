@@ -4,6 +4,8 @@ import { CreateSaleItemDto } from "src/sale_items/dto/create-sale_item.dto";
 export class CreateSaleDto {
 
 
+     customer_id:number;
+     user_id:number;
      items: CreateSaleItemDto[];
      payments: CreatePaymentDto[];
 
