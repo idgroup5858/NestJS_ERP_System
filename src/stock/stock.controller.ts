@@ -12,6 +12,11 @@ export class StockController {
     return this.stockService.create(createStockDto);
   }
 
+  @Post("updatefilter")
+  updateFilter(@Body() createStockDto: CreateStockDto) {
+    return this.stockService.updateFilter(createStockDto);
+  }
+
   @Get("all")
   findAll() {
     return this.stockService.findAll();
