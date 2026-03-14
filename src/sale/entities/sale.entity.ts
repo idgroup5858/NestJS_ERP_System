@@ -13,10 +13,10 @@ export class Sale {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @OneToMany(() => SaleItem, saleItem => saleItem.sale, { cascade: true })
+    @OneToMany(() => SaleItem, saleItem => saleItem.sale, { cascade: true,onDelete:"CASCADE" })
     items: SaleItem[];
 
-    @OneToMany(() => Payment, payment => payment.sale, { cascade: true })
+    @OneToMany(() => Payment, payment => payment.sale, { cascade: true,onDelete:"CASCADE" })
     payments: Payment[];
 
 

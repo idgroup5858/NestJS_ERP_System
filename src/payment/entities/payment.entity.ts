@@ -9,7 +9,7 @@ export class Payment {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Sale, sale => sale.payments)
+  @ManyToOne(() => Sale, sale => sale.payments , {onDelete:"CASCADE"})
   sale: Sale;
 
   @Column()

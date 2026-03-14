@@ -87,18 +87,18 @@ export class StockService {
     
         return stock;
       }
-      async updateFilter(updateStockDto: CreateStockDto) {
+      async updateFilter(createStockDto: CreateStockDto) {
          const checkStock = await this.stocRepository.findOne({
 
           where:{
-            product:{id:updateStockDto.product_id},
-            warehouse:{id:updateStockDto.warehouse_id}
+            product:{id:createStockDto.product_id},
+            warehouse:{id:createStockDto.warehouse_id}
           }
 
           });
         if (!checkStock) throw new NotFoundException("Не найден Продукт");
     
-    
+        checkStock.quantity-=createStockDto.quantity
         // const stock = await this.stocRepository.preload({
         //   id,
         //   ...updateStockDto
@@ -106,7 +106,7 @@ export class StockService {
     
         // if (!stock) throw new NotFoundException()
     
-        // await this.stocRepository.save(stock)
+        await this.stocRepository.save(checkStock);
     
         return checkStock;
       }
