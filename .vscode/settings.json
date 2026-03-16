@@ -36,7 +36,9 @@
         "src/sale/sale.service.spec.ts": true,
         "src/sale/sale.controller.spec.ts": true,
         "src/payment/payment.controller.spec.ts": true,
-        "src/payment/payment.service.spec.ts": true
+        "src/payment/payment.service.spec.ts": true,
+        "src/purchase/purchase.controller.spec.ts": true,
+        "src/purchase/purchase.service.spec.ts": true
     },
     "hide-files.files": [
         "tsconfig.build.json",
@@ -70,6 +72,8 @@
         "src/sale/sale.service.spec.ts",
         "src/sale/sale.controller.spec.ts",
         "src/payment/payment.controller.spec.ts",
-        "src/payment/payment.service.spec.ts"
+        "src/payment/payment.service.spec.ts",
+        "src/purchase/purchase.controller.spec.ts",
+        "src/purchase/purchase.service.spec.ts"
     ]
 }
