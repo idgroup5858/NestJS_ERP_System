@@ -1,19 +1,20 @@
 import { Product } from "src/product/entities/product.entity";
-import { Sale } from "src/sale/entities/sale.entity";
+import { Purchase } from "src/purchase/entities/purchase.entity";
 import { Warehouse } from "src/warehouse/entities/warehouse.entity";
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 
 
 
 @Entity()
-export class SaleItem {
+export class PurchaseItem {
 
-        @PrimaryGeneratedColumn()
+
+         @PrimaryGeneratedColumn()
         id: number;
 
 
-        @ManyToOne(() => Sale, sale => sale.items,{onDelete:"CASCADE"})
-        sale: Sale;
+        @ManyToOne(() => Purchase, purchase => purchase.items,{onDelete:"CASCADE"})
+        purchase: Purchase;
 
         @ManyToOne(() => Product)
         product: Product;
@@ -29,5 +30,4 @@ export class SaleItem {
 
         @CreateDateColumn()
         date: Date;
-
 }

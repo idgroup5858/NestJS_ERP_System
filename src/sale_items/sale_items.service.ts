@@ -66,14 +66,14 @@ export class SaleItemsService {
     async findOne(id: number) {
   
       const checkSaleItem = await this.saleItemRepository.findOneBy({ id });
-      if (!checkSaleItem) throw new NotFoundException("Не найден Продукт");
+      if (!checkSaleItem) throw new NotFoundException("Не найден Продажа итем");
   
       return checkSaleItem;
     }
   
     async update(id: number, updateSaleItemDto: UpdateSaleItemDto) {
       const checkSaleItem = await this.saleItemRepository.findOneBy({ id });
-      if (!checkSaleItem) throw new NotFoundException("Не найден Продукт");
+      if (!checkSaleItem) throw new NotFoundException("Не найден Продажа итем");
   
   
       const sale_item = await this.saleItemRepository.preload({
@@ -90,9 +90,9 @@ export class SaleItemsService {
   
     async remove(id: number) {
       const checkSaleItem = await this.saleItemRepository.findOneBy({ id });
-      if (!checkSaleItem) throw new NotFoundException("Не найден Продукт");
+      if (!checkSaleItem) throw new NotFoundException("Не найден Продажа итем");
       await this.saleItemRepository.remove(checkSaleItem)
-      return { message: "Продукт удален" }
+      return { message: "Продажа итем удален" }
   
     }
 }

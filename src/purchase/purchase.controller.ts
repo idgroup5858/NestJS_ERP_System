@@ -7,12 +7,12 @@ import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 export class PurchaseController {
   constructor(private readonly purchaseService: PurchaseService) {}
 
-  @Post()
+  @Post("addfull")
   create(@Body() createPurchaseDto: CreatePurchaseDto) {
-    return this.purchaseService.create(createPurchaseDto);
+    return this.purchaseService.createFullPurchase(createPurchaseDto);
   }
 
-  @Get()
+  @Get("all")
   findAll() {
     return this.purchaseService.findAll();
   }
@@ -22,10 +22,10 @@ export class PurchaseController {
     return this.purchaseService.findOne(+id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePurchaseDto: UpdatePurchaseDto) {
-    return this.purchaseService.update(+id, updatePurchaseDto);
-  }
+  // @Patch(':id')
+  // update(@Param('id') id: string, @Body() updatePurchaseDto: UpdatePurchaseDto) {
+  //   return this.purchaseService.update(+id, updatePurchaseDto);
+  // }
 
   @Delete(':id')
   remove(@Param('id') id: string) {

@@ -66,14 +66,14 @@ export class StockService {
       async findOne(id: number) {
     
         const checkStock = await this.stocRepository.findOneBy({ id });
-        if (!checkStock) throw new NotFoundException("Не найден Продукт");
+        if (!checkStock) throw new NotFoundException("Не найден остатокт");
     
         return checkStock;
       }
     
        async update(id: number, updateStockDto: UpdateStockDto) {
          const checkStock = await this.stocRepository.findOneBy({ id });
-        if (!checkStock) throw new NotFoundException("Не найден Продукт");
+        if (!checkStock) throw new NotFoundException("Не найден остаток");
     
     
         const stock = await this.stocRepository.preload({
@@ -96,9 +96,33 @@ export class StockService {
           }
 
           });
-        if (!checkStock) throw new NotFoundException("Не найден Продукт");
+        if (!checkStock) throw new NotFoundException("Не найден остаток");
     
         checkStock.quantity-=createStockDto.quantity
+        // const stock = await this.stocRepository.preload({
+        //   id,
+        //   ...updateStockDto
+        // });
+    
+        // if (!stock) throw new NotFoundException()
+    
+        await this.stocRepository.save(checkStock);
+    
+        return checkStock;
+      }
+
+      async updateFilterAdd(createStockDto: CreateStockDto) {
+         const checkStock = await this.stocRepository.findOne({
+
+          where:{
+            product:{id:createStockDto.product_id},
+            warehouse:{id:createStockDto.warehouse_id}
+          }
+
+          });
+        if (!checkStock) throw new NotFoundException("Не найден остаток");
+    
+        checkStock.quantity+=createStockDto.quantity
         // const stock = await this.stocRepository.preload({
         //   id,
         //   ...updateStockDto
@@ -113,7 +137,7 @@ export class StockService {
     
       async remove(id: number) {
         const checkStock = await this.stocRepository.findOneBy({ id });
-        if (!checkStock) throw new NotFoundException("Не найден Продукт");
+        if (!checkStock) throw new NotFoundException("Не найден остаток");
         await this.stocRepository.remove(checkStock)
         return { message: "Продукт удален" }
     

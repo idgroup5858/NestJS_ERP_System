@@ -29,6 +29,7 @@ export class UserController {
     return this.userService.findAllPag(+page,+limit);
   }
 
+  
   @Get('getby/:id')
   findOne(@Param('id') id: string) {
     return this.userService.findOne(+id);

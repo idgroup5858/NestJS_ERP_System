@@ -68,7 +68,7 @@ export class SaleService {
 
   async findAll() {
 
-    return this.saleRepository.find({ relations: ["items", "payments", "items.product", "customer", "user"] });
+    return this.saleRepository.find();//{ relations: ["items", "payments", "items.product", "customer", "user"] }
   }
 
 
@@ -83,6 +83,7 @@ export class SaleService {
       skip,
       take: limit,
       order: { id: 'DESC' }, // ixtiyoriy
+      relations: ["items", "payments", "items.product", "customer", "user"]
     });
 
     return {
@@ -91,6 +92,7 @@ export class SaleService {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        
       },
       data
     };
@@ -102,7 +104,7 @@ export class SaleService {
   async findOne(id: number) {
 
     const checkSale = await this.saleRepository.findOneBy({ id });
-    if (!checkSale) throw new NotFoundException("Не найден Продукт");
+    if (!checkSale) throw new NotFoundException("Не найден Прдоажа");
 
     return checkSale;
   }
@@ -110,7 +112,7 @@ export class SaleService {
   async update(id: number, updateSaleDto: UpdateSaleDto) {
 
     const checkSale = await this.saleRepository.findOneBy({ id });
-    if (!checkSale) throw new NotFoundException("Sale topilmadi");
+    if (!checkSale) throw new NotFoundException("Не найден Прдоажа");
 
     const { items, payments, ...saleData } = updateSaleDto;
 
@@ -128,9 +130,9 @@ export class SaleService {
 
   async remove(id: number) {
     const checkSale = await this.saleRepository.findOneBy({ id });
-    if (!checkSale) throw new NotFoundException("Не найден Продукт");
+    if (!checkSale) throw new NotFoundException("Не найден Прдоажа");
     await this.saleRepository.remove(checkSale)
-    return { message: "Продукт удален" }
+    return { message: "Продажа удален" }
 
   }
 }

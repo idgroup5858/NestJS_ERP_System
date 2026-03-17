@@ -65,14 +65,14 @@ export class CategoryService {
       relations:["products"]
 
       });
-     if (!checkCategory) throw new NotFoundException("Не найден Продукт");
+     if (!checkCategory) throw new NotFoundException("Не найден категория");
  
      return checkCategory;
    }
  
    async update(id: number, updateCategoryDto: UpdateCategoryDto) {
     const checkCategory = await this.categoryRepository.findOneBy({ id });
-     if (!checkCategory) throw new NotFoundException("Не найден Продукт");
+     if (!checkCategory) throw new NotFoundException("Не найден категория");
  
  
      const category = await this.categoryRepository.preload({
@@ -89,10 +89,10 @@ export class CategoryService {
  
    async remove(id: number) {
       const checkCategory = await this.categoryRepository.findOneBy({ id });
-     if (!checkCategory) throw new NotFoundException("Не найден Продукт");
+     if (!checkCategory) throw new NotFoundException("Не найден категория");
  
   await this.categoryRepository.remove(checkCategory)
-     return { message: "Продукт удален" }
+     return { message: "категория удален" }
  
    }
  

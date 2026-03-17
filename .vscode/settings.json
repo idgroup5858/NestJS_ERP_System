@@ -38,7 +38,9 @@
         "src/payment/payment.controller.spec.ts": true,
         "src/payment/payment.service.spec.ts": true,
         "src/purchase/purchase.controller.spec.ts": true,
-        "src/purchase/purchase.service.spec.ts": true
+        "src/purchase/purchase.service.spec.ts": true,
+        "src/purchase_items/purchase_items.service.spec.ts": true,
+        "src/purchase_items/purchase_items.controller.spec.ts": true
     },
     "hide-files.files": [
         "tsconfig.build.json",
@@ -74,6 +76,8 @@
         "src/payment/payment.controller.spec.ts",
         "src/payment/payment.service.spec.ts",
         "src/purchase/purchase.controller.spec.ts",
-        "src/purchase/purchase.service.spec.ts"
+        "src/purchase/purchase.service.spec.ts",
+        "src/purchase_items/purchase_items.service.spec.ts",
+        "src/purchase_items/purchase_items.controller.spec.ts"
     ]
 }

@@ -30,6 +30,16 @@ export class  PaymentService {
     return stock;
   }
 
+  async createPurchase(createPaymentDto: CreatePaymentDto) {
+    const stock = this.paymentRepository.create({
+      ...createPaymentDto,
+      purchase:{id:createPaymentDto.purchase_id}
+    })
+
+    await this.paymentRepository.save(stock);
+    return stock;
+  }
+
   async findAll() {
 
     return this.paymentRepository.find({relations:["sale","sale.items","sale.items.product","sale.payments"]});
@@ -67,14 +77,14 @@ export class  PaymentService {
   async findOne(id: number) {
 
     const checkPayment = await this.paymentRepository.findOneBy({ id });
-    if (!checkPayment) throw new NotFoundException("Не найден Продукт");
+    if (!checkPayment) throw new NotFoundException("Не найден Плат");
 
     return checkPayment;
   }
 
   async update(id: number, updatePaymentkDto: UpdatePaymentDto) {
     const checkPayment = await this.paymentRepository.findOneBy({ id });
-    if (!checkPayment) throw new NotFoundException("Не найден Продукт");
+    if (!checkPayment) throw new NotFoundException("Не найден Плат");
 
 
     const payment = await this.paymentRepository.preload({
@@ -91,9 +101,9 @@ export class  PaymentService {
 
   async remove(id: number) {
     const checkPayment = await this.paymentRepository.findOneBy({ id });
-    if (!checkPayment) throw new NotFoundException("Не найден Продукт");
+    if (!checkPayment) throw new NotFoundException("Не найден Плат");
     await this.paymentRepository.remove(checkPayment)
-    return { message: "Продукт удален" }
+    return { message: "Плат удален" }
 
   }
 }

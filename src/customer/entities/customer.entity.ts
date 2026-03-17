@@ -1,3 +1,4 @@
+import { Purchase } from "src/purchase/entities/purchase.entity";
 import { Sale } from "src/sale/entities/sale.entity";
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
@@ -32,6 +33,9 @@ export class Customer {
 
         @OneToMany(() => Sale, sale => sale.customer)
         sale:Sale[]
+
+        @OneToMany(() => Purchase, purchase => purchase.customer)
+        purchase:Purchase[]
 
         @CreateDateColumn()
         createdAt: Date;
