@@ -63,9 +63,14 @@ export class UserService {
     
   }
 
-  async findOne(id: number) {
-
-    const checkUser = await this.userRepository.findOneBy({id});
+  async findOne(authorization:string) {
+    const token = authorization?.split(' ')[1];
+    const tokenVerify=this.jwtService.verify<JwtPayload>(token);
+    const access_id:number= tokenVerify.id
+    
+    console.log(tokenVerify);
+    
+    const checkUser = await this.userRepository.findOneBy({id:access_id});
     if(!checkUser) throw new NotFoundException("Не найден сотрудник с таким адресом электронной почты и паролем.");
 
     return checkUser;

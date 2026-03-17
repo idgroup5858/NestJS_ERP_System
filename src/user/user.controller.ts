@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Headers } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -29,10 +29,13 @@ export class UserController {
     return this.userService.findAllPag(+page,+limit);
   }
 
-  
-  @Get('getby/:id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
+  @UseGuards(AuthGuard('jwt'))
+  @Get('getby')
+  findOne(
+    
+    @Headers('authorization') authorization: string,
+  ) {
+    return this.userService.findOne(authorization);
   }
 
   @Patch('update/:id')
