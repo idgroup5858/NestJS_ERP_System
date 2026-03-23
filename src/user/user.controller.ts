@@ -21,6 +21,8 @@ export class UserController {
     return this.userService.findAll();
   }
   
+
+  @UseGuards(AuthGuard('jwt'))
   @Get("allpag")
   findAllPag(
     @Query("page") page:string,

@@ -34,7 +34,9 @@ export class UserService {
 
   async findAll() {
 
-    return this.userRepository.find();
+    return this.userRepository.find({
+      relations:["sale","purchase","returns"]
+    });
   }
 
   async findAllPag(page:number,limit:number) {
@@ -48,6 +50,7 @@ export class UserService {
       skip,
       take: limit,
       order: { id: 'DESC' }, // ixtiyoriy
+      relations:["sale","purchase","returns"]
     });
 
     return {

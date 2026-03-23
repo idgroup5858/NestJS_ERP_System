@@ -21,7 +21,9 @@ export class CustomerService {
 
   async findAll() {
 
-    return this.customerRepository.find();
+    return this.customerRepository.find({
+      relations:["sale","purchase","returns"]
+    });
   }
 
   async findAllPag(page: number, limit: number) {
@@ -35,6 +37,7 @@ export class CustomerService {
       skip,
       take: limit,
       order: { id: 'DESC' }, // ixtiyoriy
+      relations:["sale","purchase","returns"]
     });
 
     return {
@@ -44,7 +47,8 @@ export class CustomerService {
         limit,
         totalPages: Math.ceil(total / limit),
       },
-      data
+      data,
+      
     };
 
 
