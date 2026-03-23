@@ -40,7 +40,11 @@
         "src/purchase/purchase.controller.spec.ts": true,
         "src/purchase/purchase.service.spec.ts": true,
         "src/purchase_items/purchase_items.service.spec.ts": true,
-        "src/purchase_items/purchase_items.controller.spec.ts": true
+        "src/purchase_items/purchase_items.controller.spec.ts": true,
+        "src/return/return.controller.spec.ts": true,
+        "src/return/return.service.spec.ts": true,
+        "src/return_items/return_items.service.spec.ts": true,
+        "src/return_items/return_items.controller.spec.ts": true
     },
     "hide-files.files": [
         "tsconfig.build.json",
@@ -78,6 +82,10 @@
         "src/purchase/purchase.controller.spec.ts",
         "src/purchase/purchase.service.spec.ts",
         "src/purchase_items/purchase_items.service.spec.ts",
-        "src/purchase_items/purchase_items.controller.spec.ts"
+        "src/purchase_items/purchase_items.controller.spec.ts",
+        "src/return/return.controller.spec.ts",
+        "src/return/return.service.spec.ts",
+        "src/return_items/return_items.service.spec.ts",
+        "src/return_items/return_items.controller.spec.ts"
     ]
 }

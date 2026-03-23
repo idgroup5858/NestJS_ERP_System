@@ -40,6 +40,16 @@ export class  PaymentService {
     return stock;
   }
 
+  async createReturn(createPaymentDto: CreatePaymentDto) {
+    const stock = this.paymentRepository.create({
+      ...createPaymentDto,
+      returns:{id:createPaymentDto.return_id}
+    })
+
+    await this.paymentRepository.save(stock);
+    return stock;
+  }
+
   async findAll() {
 
     return this.paymentRepository.find({relations:["sale","sale.items","sale.items.product","sale.payments"]});

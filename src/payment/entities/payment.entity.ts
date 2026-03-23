@@ -1,6 +1,7 @@
 import { Purchase } from "src/purchase/entities/purchase.entity";
+import { Return } from "src/return/entities/return.entity";
 import { Sale } from "src/sale/entities/sale.entity";
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
 
@@ -15,6 +16,10 @@ export class Payment {
 
   @ManyToOne(() => Purchase, purchase => purchase.payments , {onDelete:"CASCADE",nullable:true})
   purchase: Purchase;
+
+
+  @ManyToOne(() => Return, returns => returns.payments , { onDelete:"CASCADE" , nullable:true })
+  returns:Return;
 
   @Column()
   amount: number;

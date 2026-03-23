@@ -1,7 +1,7 @@
-export class CreatePurchaseItemDto {
+export class CreateReturnItemDto {
 
-
-    purchase_id:number;
+    
+    return_id:number;
     product_id:number;
     warehouse_id:number;
 
