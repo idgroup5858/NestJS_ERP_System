@@ -104,7 +104,7 @@ export class PurchaseService {
     async findOne(id: number) {
   
       const checkSale = await this.purchaseRepository.findOneBy({ id });
-      if (!checkSale) throw new NotFoundException("Не найден Прдоажа");
+      if (!checkSale) throw new NotFoundException("Не найден Приход");
   
       return checkSale;
     }
