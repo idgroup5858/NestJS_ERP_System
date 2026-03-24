@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -19,6 +19,12 @@ export class UserService {
   ) {}
 
   async create(createUserDto: CreateUserDto) {
+     const checkUser = await this.userRepository.findOne({
+      
+       where:{email:createUserDto.email},
+    
+    });
+    if(checkUser) throw new ConflictException("Сотрудник уже ест !");
     const hashedPassword = await bcrypt.hash(createUserDto.password,10);
     const user = this.userRepository.create({
       ...createUserDto,
@@ -35,7 +41,7 @@ export class UserService {
   async findAll() {
 
     return this.userRepository.find({
-      relations:["sale","purchase","returns"]
+      //relations:["sale","purchase","returns"]
     });
   }
 
@@ -50,7 +56,7 @@ export class UserService {
       skip,
       take: limit,
       order: { id: 'DESC' }, // ixtiyoriy
-      relations:["sale","purchase","returns"]
+     // relations:["sale","purchase","returns"]
     });
 
     return {
@@ -73,7 +79,12 @@ export class UserService {
     
     console.log(tokenVerify);
     
-    const checkUser = await this.userRepository.findOneBy({id:access_id});
+    const checkUser = await this.userRepository.findOne({
+      
+       where:{id:access_id},
+       relations:["sale","purchase","returns"]
+    
+    });
     if(!checkUser) throw new NotFoundException("Не найден сотрудник с таким адресом электронной почты и паролем.");
 
     return checkUser;

@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { Repository } from 'typeorm';
 import { Category } from 'src/category/entities/category.entity';
+import { CategoryService } from 'src/category/category.service';
 
 @Injectable()
 export class ProductService {
@@ -12,31 +13,42 @@ export class ProductService {
 
   constructor(
     @InjectRepository(Product)
-    private readonly productRepository: Repository<Product>
+    private readonly productRepository: Repository<Product>,
+    private readonly categoryService: CategoryService
   ) { }
 
 
 
 
   async create(createProductDto: CreateProductDto) {
+
+    const checkCategory = await this.categoryService.findOne(createProductDto.categoryId)
+    if (!checkCategory) throw new ConflictException("Категория не найден !")
+
+    const existingProduct = await this.productRepository.findOne({
+      where: { barCode: createProductDto.barCode },
+    });
+    if (existingProduct) throw new ConflictException("Штрих код уже ест !");
+
     const product = this.productRepository.create(
       {
         ...createProductDto,
-      category:{id:createProductDto.categoryId}
+        category: { id: createProductDto.categoryId }
       }
     )
 
     await this.productRepository.save(product);
+
     return product;
   }
 
   async findAll() {
 
-    return this.productRepository.find({relations:['category',"stock","stock.warehouse"]});
+    return this.productRepository.find({ relations: ['category', "stock", "stock.warehouse"] });
   }
-  
 
-  async findAllPag(page:number,limit:number) {
+
+  async findAllPag(page: number, limit: number) {
 
     page = page > 0 ? page : 1;
     limit = limit > 0 ? limit : 10;
@@ -47,7 +59,7 @@ export class ProductService {
       skip,
       take: limit,
       order: { id: 'DESC' }, // ixtiyoriy
-      relations:["category"]
+      relations: ['category', "stock", "stock.warehouse"]
     });
 
     return {
@@ -60,16 +72,16 @@ export class ProductService {
       data
     };
 
-    
+
   }
 
 
   async findOne(id: number) {
 
-    const checkProduct = await this.productRepository.findOne({ 
-      where:{id},
-      relations:["category"]
-     });
+    const checkProduct = await this.productRepository.findOne({
+      where: { id },
+      relations: ['category', "stock", "stock.warehouse"]
+    });
     if (!checkProduct) throw new NotFoundException("Не найден Продукт");
 
     return checkProduct;

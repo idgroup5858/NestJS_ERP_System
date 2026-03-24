@@ -12,7 +12,7 @@ export class Product {
     name:string;
     @Column({nullable:true})
     code:string;
-    @Column()
+    @Column({unique:true})
     barCode:string;
     @Column({nullable:true})
     imgUrl:string;

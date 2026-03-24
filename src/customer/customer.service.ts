@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,6 +13,14 @@ export class CustomerService {
     private readonly customerRepository: Repository<Customer>
   ) { }
   async create(createCustomerDto: CreateCustomerDto) {
+
+    const checkUser = await this.customerRepository.findOne({
+
+      where: { phone: createCustomerDto.phone },
+
+    });
+    if (checkUser) throw new ConflictException("Клиент уже ест !");
+
     const customer = this.customerRepository.create(createCustomerDto)
 
     await this.customerRepository.save(customer);
@@ -22,7 +30,7 @@ export class CustomerService {
   async findAll() {
 
     return this.customerRepository.find({
-      relations:["sale","purchase","returns"]
+     
     });
   }
 
@@ -37,7 +45,7 @@ export class CustomerService {
       skip,
       take: limit,
       order: { id: 'DESC' }, // ixtiyoriy
-      relations:["sale","purchase","returns"]
+      //relations: ["sale", "purchase", "returns"]
     });
 
     return {
@@ -48,7 +56,7 @@ export class CustomerService {
         totalPages: Math.ceil(total / limit),
       },
       data,
-      
+
     };
 
 
@@ -56,7 +64,10 @@ export class CustomerService {
 
   async findOne(id: number) {
 
-    const checkCustomer = await this.customerRepository.findOneBy({ id });
+    const checkCustomer = await this.customerRepository.findOne({
+      where:{id},
+       relations: ["sale", "purchase", "returns"]
+      });
     if (!checkCustomer) throw new NotFoundException("Не найден Клиент с таким адресом электронной почты и паролем.");
 
     return checkCustomer;

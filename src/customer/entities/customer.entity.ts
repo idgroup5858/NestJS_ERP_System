@@ -19,9 +19,7 @@ export class Customer {
         @Column({unique:true})
         phone: string;
     
-        @Column({default:null})
-        sales: string;
-    
+          
         @Column({default:0})
         balance: number;
     
