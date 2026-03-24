@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {  Injectable, NotFoundException } from '@nestjs/common';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { Sale } from './entities/sale.entity';
@@ -109,24 +109,24 @@ export class SaleService {
     return checkSale;
   }
 
-  async update(id: number, updateSaleDto: UpdateSaleDto) {
+  // async update(id: number, updateSaleDto: UpdateSaleDto) {
 
-    const checkSale = await this.saleRepository.findOneBy({ id });
-    if (!checkSale) throw new NotFoundException("Не найден Прдоажа");
+  //   const checkSale = await this.saleRepository.findOneBy({ id });
+  //   if (!checkSale) throw new NotFoundException("Не найден Прдоажа");
 
-    const { items, payments, ...saleData } = updateSaleDto;
+  //   const { items, payments, ...saleData } = updateSaleDto;
 
-    const sale = await this.saleRepository.preload({
-      id,
-      ...saleData
-    });
+  //   const sale = await this.saleRepository.preload({
+  //     id,
+  //     ...saleData
+  //   });
 
-    if (!sale) throw new NotFoundException();
+  //   if (!sale) throw new NotFoundException();
 
-    await this.saleRepository.save(sale);
+  //   await this.saleRepository.save(sale);
 
-    return sale;
-  }
+  //   return sale;
+  // }
 
   async remove(id: number) {
     const checkSale = await this.saleRepository.findOneBy({ id });

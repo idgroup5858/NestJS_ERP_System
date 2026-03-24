@@ -4,142 +4,136 @@ import { UpdateStockDto } from './dto/update-stock.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Stock } from './entities/stock.entity';
 import { Repository } from 'typeorm';
+import { ProductService } from 'src/product/product.service';
+import { WarehouseService } from 'src/warehouse/warehouse.service';
 
 @Injectable()
 export class StockService {
-
-
   constructor(
-        @InjectRepository(Stock)
-        private readonly stocRepository: Repository<Stock>
-      ) { }
-    
-    
-    
-    
-      async create(createStockDto: CreateStockDto) {
-        const stock = this.stocRepository.create({
-          quantity:createStockDto.quantity,
-          product:{id:createStockDto.product_id},
-          warehouse:{id:createStockDto.warehouse_id}
-        })
-    
-        await this.stocRepository.save(stock);
-        return stock;
-      }
-    
-      async findAll() {
-    
-        return this.stocRepository.find({
-          relations:["product","warehouse"]
-        });
-      }
-      
-    
-      async findAllPag(page:number,limit:number) {
-    
-        page = page > 0 ? page : 1;
-        limit = limit > 0 ? limit : 10;
-    
-        const skip = (page - 1) * limit;
-    
-        const [data, total] = await this.stocRepository.findAndCount({
-          skip,
-          take: limit,
-          order: { id: 'DESC' }, // ixtiyoriy
-        });
-    
-        return {
-          meta: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-          },
-          data
-        };
-    
+    @InjectRepository(Stock)
+    private readonly stocRepository: Repository<Stock>,
+    private readonly productService: ProductService,
+    private readonly wareHouseService:WarehouseService,
+  ) {}
+
+  async create(createStockDto: CreateStockDto) {
+    await this.productService.findOne(createStockDto.product_id);
+    await this.wareHouseService.findOne(createStockDto.warehouse_id);
+
+    const stock = this.stocRepository.create({
+      quantity: createStockDto.quantity,
+      product: { id: createStockDto.product_id },
+      warehouse: { id: createStockDto.warehouse_id },
+    });
+
+    await this.stocRepository.save(stock);
+    return stock;
+  }
+
+  async findAll() {
+    return this.stocRepository.find({
+      relations: ['product', 'warehouse'],
+    });
+  }
+
+  async findAllPag(page: number, limit: number) {
+    page = page > 0 ? page : 1;
+    limit = limit > 0 ? limit : 10;
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.stocRepository.findAndCount({
+      skip,
+      take: limit,
+      order: { id: 'DESC' }, // ixtiyoriy
+      relations: ['product', 'warehouse'],
+    });
+
+    return {
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
         
-      }
-    
-    
-      async findOne(id: number) {
-    
-        const checkStock = await this.stocRepository.findOneBy({ id });
-        if (!checkStock) throw new NotFoundException("Не найден остатокт");
-    
-        return checkStock;
-      }
-    
-       async update(id: number, updateStockDto: UpdateStockDto) {
-         const checkStock = await this.stocRepository.findOneBy({ id });
-        if (!checkStock) throw new NotFoundException("Не найден остаток");
-    
-    
-        const stock = await this.stocRepository.preload({
-          id,
-          ...updateStockDto
-        });
-    
-        if (!stock) throw new NotFoundException()
-    
-        await this.stocRepository.save(stock)
-    
-        return stock;
-      }
-      async updateFilter(createStockDto: CreateStockDto) {
-         const checkStock = await this.stocRepository.findOne({
+      },
+      data,
+    };
+  }
 
-          where:{
-            product:{id:createStockDto.product_id},
-            warehouse:{id:createStockDto.warehouse_id}
-          }
+  async findOne(id: number) {
+    const checkStock = await this.stocRepository.findOne({ 
+      where:{id},
+      relations: ['product', 'warehouse'],
+     });
+    if (!checkStock) throw new NotFoundException('Не найден остатокт');
 
-          });
-        if (!checkStock) throw new NotFoundException("Не найден остаток");
-    
-        checkStock.quantity-=createStockDto.quantity
-        // const stock = await this.stocRepository.preload({
-        //   id,
-        //   ...updateStockDto
-        // });
-    
-        // if (!stock) throw new NotFoundException()
-    
-        await this.stocRepository.save(checkStock);
-    
-        return checkStock;
-      }
+    return checkStock;
+  }
 
-      async updateFilterAdd(createStockDto: CreateStockDto) {
-         const checkStock = await this.stocRepository.findOne({
+  async update(id: number, updateStockDto: UpdateStockDto) {
+    const checkStock = await this.stocRepository.findOneBy({ id });
+    if (!checkStock) throw new NotFoundException('Не найден остаток');
 
-          where:{
-            product:{id:createStockDto.product_id},
-            warehouse:{id:createStockDto.warehouse_id}
-          }
+    const stock = await this.stocRepository.preload({
+      id,
+      ...updateStockDto,
+    });
 
-          });
-        if (!checkStock) throw new NotFoundException("Не найден остаток");
-    
-        checkStock.quantity+=createStockDto.quantity
-        // const stock = await this.stocRepository.preload({
-        //   id,
-        //   ...updateStockDto
-        // });
-    
-        // if (!stock) throw new NotFoundException()
-    
-        await this.stocRepository.save(checkStock);
-    
-        return checkStock;
-      }
-    
-      async remove(id: number) {
-        const checkStock = await this.stocRepository.findOneBy({ id });
-        if (!checkStock) throw new NotFoundException("Не найден остаток");
-        await this.stocRepository.remove(checkStock)
-        return { message: "Продукт удален" }
-    
-      }
+    if (!stock) throw new NotFoundException();
+
+    await this.stocRepository.save(stock);
+
+    return stock;
+  }
+  async updateFilter(createStockDto: CreateStockDto) {
+    const checkStock = await this.stocRepository.findOne({
+      where: {
+        product: { id: createStockDto.product_id },
+        warehouse: { id: createStockDto.warehouse_id },
+      },
+    });
+    if (!checkStock) throw new NotFoundException('Не найден остаток');
+
+    checkStock.quantity -= createStockDto.quantity;
+    // const stock = await this.stocRepository.preload({
+    //   id,
+    //   ...updateStockDto
+    // });
+
+    // if (!stock) throw new NotFoundException()
+
+    await this.stocRepository.save(checkStock);
+
+    return checkStock;
+  }
+
+  async updateFilterAdd(createStockDto: CreateStockDto) {
+    const checkStock = await this.stocRepository.findOne({
+      where: {
+        product: { id: createStockDto.product_id },
+        warehouse: { id: createStockDto.warehouse_id },
+      },
+    });
+    if (!checkStock) throw new NotFoundException('Не найден остаток');
+
+    checkStock.quantity += createStockDto.quantity;
+    // const stock = await this.stocRepository.preload({
+    //   id,
+    //   ...updateStockDto
+    // });
+
+    // if (!stock) throw new NotFoundException()
+
+    await this.stocRepository.save(checkStock);
+
+    return checkStock;
+  }
+
+  async remove(id: number) {
+    const checkStock = await this.stocRepository.findOneBy({ id });
+    if (!checkStock) throw new NotFoundException('Не найден остаток');
+    await this.stocRepository.remove(checkStock);
+    return { message: 'Продукт удален' };
+  }
 }

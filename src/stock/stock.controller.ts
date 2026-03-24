@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { StockService } from './stock.service';
 import { CreateStockDto } from './dto/create-stock.dto';
 import { UpdateStockDto } from './dto/update-stock.dto';
@@ -20,6 +20,14 @@ export class StockController {
   @Get("all")
   findAll() {
     return this.stockService.findAll();
+  }
+
+  @Get("allpag")
+  findAllPag(
+    @Query("page") page:string,
+    @Query("limit") limit:string
+  ) {
+    return this.stockService.findAllPag(+page,+limit);
   }
 
   @Get('getby/:id')
