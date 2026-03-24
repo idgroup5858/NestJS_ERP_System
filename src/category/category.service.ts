@@ -41,6 +41,7 @@ export class CategoryService {
        skip,
        take: limit,
        order: { id: 'DESC' }, // ixtiyoriy
+       relations:["products"]
      });
  
      return {
@@ -48,7 +49,8 @@ export class CategoryService {
          total,
          page,
          limit,
-         totalPages: Math.ceil(total / limit),
+         totalPages: Math.ceil(total / limit)
+         
        },
        data
      };
