@@ -23,16 +23,20 @@ export class SaleService {
 
   async createFullSale(createSaleDto: CreateSaleDto) {
 
-    let total = 0;
+    let total:number = 0;
 
     for (const item of createSaleDto.items) {
       total += item.quantity * item.price;
     }
 
+    console.log(total);
+    
+
     const sale = this.saleRepository.create({
       customer: { id: createSaleDto.customer_id },
       user: { id: createSaleDto.user_id },
-      total
+      total,
+      discount:createSaleDto.discount
     });
 
     await this.saleRepository.save(sale);

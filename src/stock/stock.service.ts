@@ -96,13 +96,7 @@ export class StockService {
     if (!checkStock) throw new NotFoundException('Не найден остаток');
 
     checkStock.quantity -= createStockDto.quantity;
-    // const stock = await this.stocRepository.preload({
-    //   id,
-    //   ...updateStockDto
-    // });
-
-    // if (!stock) throw new NotFoundException()
-
+   
     await this.stocRepository.save(checkStock);
 
     return checkStock;
@@ -118,13 +112,7 @@ export class StockService {
     if (!checkStock) throw new NotFoundException('Не найден остаток');
 
     checkStock.quantity += createStockDto.quantity;
-    // const stock = await this.stocRepository.preload({
-    //   id,
-    //   ...updateStockDto
-    // });
-
-    // if (!stock) throw new NotFoundException()
-
+    
     await this.stocRepository.save(checkStock);
 
     return checkStock;

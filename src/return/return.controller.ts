@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { ReturnService } from './return.service';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateReturnDto } from './dto/update-return.dto';
@@ -16,6 +16,14 @@ export class ReturnController {
   findAll() {
     return this.returnService.findAll();
   }
+
+   @Get("allpag")
+    findAllPag(
+      @Query("page") page:string,
+      @Query("limit") limit:string
+    ) {
+      return this.returnService.findAllPag(+page,+limit);
+    }
 
   @Get(':id')
   findOne(@Param('id') id: string) {

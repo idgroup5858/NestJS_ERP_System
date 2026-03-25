@@ -26,7 +26,10 @@ export class Sale {
     @ManyToOne(() => User, user => user.sale)
     user:User;
 
-    @Column({ type: 'decimal', default: 0 })
+    @Column({  default: 0 })
+    discount: number;
+
+    @Column({  default: 0 })
     total: number;
 
     @CreateDateColumn()

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
@@ -17,6 +17,14 @@ export class PurchaseController {
     return this.purchaseService.findAll();
   }
 
+  @Get("allpag")
+  findAllPag(
+    @Query("page") page:string,
+    @Query("limit") limit:string
+  ) {
+    return this.purchaseService.findAllPag(+page,+limit);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.purchaseService.findOne(+id);
@@ -27,7 +35,7 @@ export class PurchaseController {
   //   return this.purchaseService.update(+id, updatePurchaseDto);
   // }
 
-  @Delete(':id')
+  @Delete('delete/:id')
   remove(@Param('id') id: string) {
     return this.purchaseService.remove(+id);
   }

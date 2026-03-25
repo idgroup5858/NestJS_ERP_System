@@ -6,6 +6,7 @@ export class CreateSaleDto {
 
      customer_id:number;
      user_id:number;
+     discount:number;
      items: CreateSaleItemDto[];
      payments: CreatePaymentDto[];
 
