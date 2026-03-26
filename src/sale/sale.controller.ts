@@ -26,6 +26,14 @@ export class SaleController {
       return this.saleService.findAllPag(+page, +limit);
   }
 
+  @Get("allrange")
+    findAllWithRange(
+     @Query("start") startDate:string,
+     @Query("end") endDate:string
+    ) {
+      return this.saleService.findAllWithRange(startDate,endDate);
+  }
+
   @Get("all")
   findAll() {
     return this.saleService.findAll();

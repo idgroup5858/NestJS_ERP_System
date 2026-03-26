@@ -16,6 +16,8 @@ import { PurchaseModule } from './purchase/purchase.module';
 import { PurchaseItemsModule } from './purchase_items/purchase_items.module';
 import { ReturnModule } from './return/return.module';
 import { ReturnItemsModule } from './return_items/return_items.module';
+import { TaskPipelineModule } from './task_pipeline/task_pipeline.module';
+import { TaskModule } from './task/task.module';
 
 @Module({
   imports: [CustomerModule, UserModule, WarehouseModule, ProductModule, SaleModule, StockModule, PaymentModule, SaleItemsModule, DatabaseModule,
@@ -28,6 +30,8 @@ import { ReturnItemsModule } from './return_items/return_items.module';
     PurchaseItemsModule,
     ReturnModule,
     ReturnItemsModule,
+    TaskPipelineModule,
+    TaskModule,
   ],
   controllers: [AppController],
   providers: [AppService],

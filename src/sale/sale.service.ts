@@ -3,7 +3,7 @@ import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { Sale } from './entities/sale.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { SaleItemsService } from 'src/sale_items/sale_items.service';
 import { PaymentService } from 'src/payment/payment.service';
 import { StockService } from 'src/stock/stock.service';
@@ -73,6 +73,23 @@ export class SaleService {
   async findAll() {
 
     return this.saleRepository.find();//{ relations: ["items", "payments", "items.product", "customer", "user"] }
+  }
+
+
+  async findAllWithRange(startDate:string,endDate:string){
+    const start= new Date(startDate);
+    const end = new Date(endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    const result = await this.saleRepository.find({
+      where:{
+        date:Between(start, end)
+      },
+      //relations: ["items", "payments", "items.product", "customer", "user"]
+    })
+
+    return result;
   }
 
 
