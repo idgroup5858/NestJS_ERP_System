@@ -1,20 +1,37 @@
+import { TaskPipeline } from "src/task_pipeline/entities/task_pipeline.entity";
+import { User } from "src/user/entities/user.entity";
+import { Column, CreateDateColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+
 export class Task {
 
 
-    id:number;
-    title:string;
-    description:string;
-    priority:string;
+    @PrimaryGeneratedColumn()
+    id: number;
+    @Column()
+    title: string;
+    @Column()
+    description: string;
+    @Column()
+    priority: string;
+
+    @ManyToOne(() => TaskPipeline , pipeline => pipeline.tasks)
+    pipeline: TaskPipeline;
+
+    @ManyToOne(() => User , owner => owner.ownedTasks)
+    owner: User;
+
+    @ManyToOne(() => User , asigned => asigned.assignedTasks)
+    assigned: User;
 
 
-    pipeline:string;
-    owner:string;
-    assigned:string;
+    @Column({ type: 'datetime', nullable: true })
+    dueDate: Date;
 
-    due_date:Date;
-    updatedAt:Date;
-    
-    date:Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
+
+    @CreateDateColumn()
+    date: Date;
 
 
 }

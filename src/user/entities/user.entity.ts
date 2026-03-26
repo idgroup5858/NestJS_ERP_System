@@ -1,6 +1,7 @@
 import { Purchase } from "src/purchase/entities/purchase.entity";
 import { Return } from "src/return/entities/return.entity";
 import { Sale } from "src/sale/entities/sale.entity";
+import { Task } from "src/task/entities/task.entity";
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
@@ -40,6 +41,13 @@ export class User {
 
     @OneToMany(() => Return, returns => returns.user)
     returns:Return[]
+
+    @OneToMany(() => Task, ownedTasks => ownedTasks.owner)
+    ownedTasks:Task[]
+
+
+    @OneToMany(() => Task, assignedTasks => assignedTasks.assigned)
+    assignedTasks:Task[]
 
     @CreateDateColumn()
     createdAt: Date;
