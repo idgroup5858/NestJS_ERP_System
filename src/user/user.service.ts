@@ -45,6 +45,38 @@ export class UserService {
     });
   }
 
+  async findAllPagSearch(page: number, limit: number, search?: string) {
+  page = page > 0 ? page : 1;
+  limit = limit > 0 ? limit : 10;
+
+  const skip = (page - 1) * limit;
+
+  const query = this.userRepository.createQueryBuilder('user');
+
+  // 🔍 Search qo‘shish
+  if (search) {
+    query.where(
+      'user.username LIKE :search OR user.email LIKE :search',
+      { search: `%${search}%` }
+    );
+  }
+
+  const [data, total] = await query
+    .orderBy('user.id', 'DESC')
+    .skip(skip)
+    .take(limit)
+    .getManyAndCount();
+
+  return {
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+    data,
+  };
+}
   async findAllPag(page:number,limit:number) {
 
     page = page > 0 ? page : 1;

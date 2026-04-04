@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Headers, Search } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -22,13 +22,22 @@ export class UserController {
   }
   
 
-  @UseGuards(AuthGuard('jwt'))
+  //@UseGuards(AuthGuard('jwt'))
   @Get("allpag")
   findAllPag(
     @Query("page") page:string,
     @Query("limit") limit:string
   ) {
     return this.userService.findAllPag(+page,+limit);
+  }
+
+   @Get("allpagsearch")
+  findAllPagSearch(
+    @Query("page") page:string,
+    @Query("limit") limit:string,
+    @Query("search") search:string
+  ) {
+    return this.userService.findAllPagSearch(+page,+limit,search);
   }
 
   @UseGuards(AuthGuard('jwt'))
