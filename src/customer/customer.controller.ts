@@ -25,6 +25,15 @@ export class CustomerController {
     return this.customerService.findAllPag(+page,+limit);
   }
 
+  @Get("allpagsearch")
+  findAllPagSearch(
+    @Query("page") page:string,
+    @Query("limit") limit:string,
+    @Query("search") search:string
+  ) {
+    return this.customerService.findAllPagSearch(+page,+limit,search);
+  }
+
   @Get('getby/:id')
   findOne(@Param('id') id: string) {
     return this.customerService.findOne(+id);
