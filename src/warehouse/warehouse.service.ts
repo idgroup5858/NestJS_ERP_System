@@ -70,6 +70,6 @@ export class WarehouseService {
       const checkWareHouse = await this.wareHouseRepository.findOneBy({ id });
       if (!checkWareHouse) throw new NotFoundException("Не найден Склад");
       await this.wareHouseRepository.remove(checkWareHouse)
-      return { message: "Клиент удален" };
+      return { message: "Склад удален" };
     }
 }
