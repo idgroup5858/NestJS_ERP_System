@@ -31,7 +31,7 @@ export class WarehouseService {
     async findAll() {
   
       return this.wareHouseRepository.find({
-        //relations:["stock","stock.product"]
+        relations:["stock","stock.product"]
       });
     }
   

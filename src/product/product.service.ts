@@ -46,6 +46,42 @@ export class ProductService {
     return this.productRepository.find({ relations: ['category', "stock", "stock.warehouse"] });
   }
 
+  async findAllPagSearch(page: number, limit: number, search?: string) {
+  page = page > 0 ? page : 1;
+  limit = limit > 0 ? limit : 10;
+
+  const skip = (page - 1) * limit;
+
+  const query = this.productRepository.createQueryBuilder('product')
+  .leftJoinAndSelect('product.category', 'category')
+  .leftJoinAndSelect('product.stock', 'stock')
+  .leftJoinAndSelect('stock.warehouse', 'warehouse');;
+
+  // 🔍 Search qo‘shish
+  if (search) {
+    query.where(
+      'product.name LIKE :search OR product.barCode LIKE :search',
+      { search: `%${search}%` }
+    );
+  }
+
+  const [data, total] = await query
+    .orderBy('product.id', 'DESC')
+    .skip(skip)
+    .take(limit)
+    .getManyAndCount();
+
+  return {
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+    data,
+  };
+}
+
 
   async findAllPag(page: number, limit: number) {
 
