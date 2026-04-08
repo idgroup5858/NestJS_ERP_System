@@ -55,7 +55,7 @@ export class ProductService {
   const query = this.productRepository.createQueryBuilder('product')
   .leftJoinAndSelect('product.category', 'category')
   .leftJoinAndSelect('product.stock', 'stock')
-  .leftJoinAndSelect('stock.warehouse', 'warehouse');;
+  .leftJoinAndSelect('stock.warehouse', 'warehouse');
 
   // 🔍 Search qo‘shish
   if (search) {

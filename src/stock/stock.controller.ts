@@ -30,6 +30,16 @@ export class StockController {
     return this.stockService.findAllPag(+page,+limit);
   }
 
+  @Get("allpagsearch")
+  findAllPagSearch(
+    @Query("page") page:string,
+    @Query("limit") limit:string,
+    @Query("search") search:string
+  ) {
+    return this.stockService.findAllPagSearch(+page,+limit,search);
+  }
+
+
   @Get('getby/:id')
   findOne(@Param('id') id: string) {
     return this.stockService.findOne(+id);
