@@ -23,6 +23,6 @@ export class Stock {
     @ManyToOne(() => Warehouse, warehouse => warehouse.stock)
     warehouse: Warehouse;
 
-    @ManyToOne(() => User, { onDelete: 'SET NULL', })
+    @ManyToOne(() => User, { onDelete: 'SET NULL', nullable:true})
     user: User;
 }

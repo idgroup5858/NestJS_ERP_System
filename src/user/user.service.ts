@@ -192,6 +192,7 @@ export class UserService {
 
 
     return {
+      user,
       accessToken,
       exspiresIn_accessToken:"15d",
       refreshToken,

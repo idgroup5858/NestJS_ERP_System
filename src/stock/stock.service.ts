@@ -24,7 +24,7 @@ export class StockService {
       quantity: createStockDto.quantity,
       product: { id: createStockDto.product_id },
       warehouse: { id: createStockDto.warehouse_id},
-      //user: { id: createStockDto.user_id},
+      user: createStockDto.user_id ? { id: createStockDto.user_id}:undefined,
     });
 
     await this.stocRepository.save(stock);
@@ -72,6 +72,7 @@ export class StockService {
 
   const query = this.stocRepository.createQueryBuilder('stock')
   .leftJoinAndSelect('stock.product', 'product')
+  .leftJoinAndSelect('stock.user', 'user')
   .leftJoinAndSelect('stock.warehouse', 'warehouse');
 
   // 🔍 Search qo‘shish

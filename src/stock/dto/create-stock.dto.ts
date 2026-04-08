@@ -9,6 +9,7 @@ export class CreateStockDto {
         @IsNumber()
         warehouse_id: number;
         
+        user_id:number;
         @IsNumber()
         quantity: number;
 }
