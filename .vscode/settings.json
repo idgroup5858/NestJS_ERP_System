@@ -6,8 +6,6 @@
         "**/.DS_Store": true,
         "**/Thumbs.db": true,
         "tsconfig.build.json": true,
-        "README.md": true,
-        "nest-cli.json": true,
         "eslint.config.mjs": true,
         "tsconfig.json": true,
         ".prettierrc": true,
@@ -52,8 +50,6 @@
     },
     "hide-files.files": [
         "tsconfig.build.json",
-        "README.md",
-        "nest-cli.json",
         "eslint.config.mjs",
         "tsconfig.json",
         ".prettierrc",

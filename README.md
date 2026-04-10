@@ -1,3 +1,71 @@
+
+
+
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt install -y nodejs
+
+
+
+
+
+            sudo apt install git -y
+
+
+
+
+            CREATE DATABASE myapp;
+
+
+
+
+            CREATE USER 'myuser'@'localhost' IDENTIFIED BY 'password';
+            GRANT ALL PRIVILEGES ON myapp.* TO 'myuser'@'localhost';
+            FLUSH PRIVILEGES;
+
+            ALTER USER 'root'@'localhost'
+            IDENTIFIED WITH mysql_native_password
+            BY 'root';
+
+            FLUSH PRIVILEGES;
+
+
+
+            git clone https://github.com/your-username/your-project.git
+            cd your-project
+
+
+
+
+            nano .env
+
+
+
+            npm install
+            npm run build
+
+
+            sudo npm install -g pm2
+
+
+
+            pm2 start dist/main.js --name nest-app
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
