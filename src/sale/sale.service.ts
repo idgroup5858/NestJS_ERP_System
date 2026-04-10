@@ -122,6 +122,45 @@ export class SaleService {
   }
 
 
+
+    async findAllPagSearch(page: number, limit: number, search?: string) {
+  page = page > 0 ? page : 1;
+  limit = limit > 0 ? limit : 10;
+
+  const skip = (page - 1) * limit;
+
+  const query = this.saleRepository.createQueryBuilder('sale')
+  .leftJoinAndSelect('sale.items', 'items')
+  .leftJoinAndSelect('sale.payments', 'payments')
+  .leftJoinAndSelect('sale.user', 'user')
+  .leftJoinAndSelect('sale.customer', 'customer');
+
+  // 🔍 Search qo‘shish
+  if (search) {
+    query.where(
+      'user.username LIKE :search OR customer.username LIKE :search',
+      { search: `%${search}%`}
+    );
+  }
+
+  const [data, total] = await query
+    .orderBy('sale.id', 'DESC')
+    .skip(skip)
+    .take(limit)
+    .getManyAndCount();
+
+  return {
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+    data,
+  };
+}
+
+
   async findOne(id: number) {
 
     const checkSale = await this.saleRepository.findOneBy({ id });
