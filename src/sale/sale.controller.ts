@@ -26,7 +26,7 @@ export class SaleController {
       return this.saleService.findAllPag(+page, +limit);
   }
 
-    @Get("allpagsearch")
+  @Get("allpagsearch")
   findAllPagSearch(
     @Query("page") page:string,
     @Query("limit") limit:string,

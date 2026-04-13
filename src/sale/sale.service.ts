@@ -133,6 +133,7 @@ export class SaleService {
   .leftJoinAndSelect('sale.items', 'items')
   .leftJoinAndSelect('sale.payments', 'payments')
   .leftJoinAndSelect('sale.user', 'user')
+  .leftJoinAndSelect('items.warehouse', 'warehouse')
   .leftJoinAndSelect('sale.customer', 'customer');
 
   // 🔍 Search qo‘shish

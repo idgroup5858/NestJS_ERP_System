@@ -46,7 +46,8 @@
         "src/task/task.controller.spec.ts": true,
         "src/task/task.service.spec.ts": true,
         "src/task_pipeline/task_pipeline.controller.spec.ts": true,
-        "src/task_pipeline/task_pipeline.service.spec.ts": true
+        "src/task_pipeline/task_pipeline.service.spec.ts": true,
+        "nest-cli.json": true
     },
     "hide-files.files": [
         "tsconfig.build.json",
@@ -90,6 +91,7 @@
         "src/task/task.controller.spec.ts",
         "src/task/task.service.spec.ts",
         "src/task_pipeline/task_pipeline.controller.spec.ts",
-        "src/task_pipeline/task_pipeline.service.spec.ts"
+        "src/task_pipeline/task_pipeline.service.spec.ts",
+        "nest-cli.json"
     ]
 }
