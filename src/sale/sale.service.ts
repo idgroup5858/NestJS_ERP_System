@@ -134,6 +134,7 @@ export class SaleService {
   .leftJoinAndSelect('sale.payments', 'payments')
   .leftJoinAndSelect('sale.user', 'user')
   .leftJoinAndSelect('items.warehouse', 'warehouse')
+  .leftJoinAndSelect('items.product', 'product')
   .leftJoinAndSelect('sale.customer', 'customer');
 
   // 🔍 Search qo‘shish
