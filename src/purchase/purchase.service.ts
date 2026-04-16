@@ -32,7 +32,8 @@ export class PurchaseService {
       const purchase = this.purchaseRepository.create({
         customer: { id: createPurchaseDto.customer_id },
         user: { id: createPurchaseDto.user_id },
-        total
+        total,
+        discount:createPurchaseDto.discount
       });
   
       await this.purchaseRepository.save(purchase);

@@ -5,6 +5,7 @@ export class CreateReturnDto {
 
     customer_id: number;
     user_id: number;
+    discount:number;
     items: CreateReturnItemDto[];
     payments: CreatePaymentDto[];
 }

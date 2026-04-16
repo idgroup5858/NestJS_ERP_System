@@ -23,6 +23,9 @@ export class Return {
     @ManyToOne(() => User, user=> user.returns)
     user:User;
 
+    @Column({  default: 0 })
+    discount: number;
+
     @Column()
     total:number;
 

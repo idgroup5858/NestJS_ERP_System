@@ -26,6 +26,9 @@ export class Purchase {
     
         @ManyToOne(() => User, user => user.purchase)
         user:User;
+
+        @Column({  default: 0 })
+        discount: number;
     
         @Column()
         total: number;

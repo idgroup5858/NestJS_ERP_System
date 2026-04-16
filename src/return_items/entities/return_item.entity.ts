@@ -29,6 +29,9 @@ export class ReturnItem {
     @Column()
     price: number;
 
+    @Column({ default: false })
+    checkPrice: boolean;
+
     @CreateDateColumn()
     date: Date;
 }

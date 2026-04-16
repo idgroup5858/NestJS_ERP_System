@@ -32,7 +32,8 @@ export class ReturnService {
     const returns = this.returnRepository.create({
       customer: { id: createReturnsDto.customer_id },
       user: { id: createReturnsDto.user_id },
-      total
+      total,
+      discount:createReturnsDto.discount
     });
 
     await this.returnRepository.save(returns);
@@ -101,6 +102,46 @@ export class ReturnService {
 
 
   }
+
+
+    async findAllPagSearch(page: number, limit: number, search?: string) {
+        page = page > 0 ? page : 1;
+        limit = limit > 0 ? limit : 10;
+
+        const skip = (page - 1) * limit;
+
+        const query = this.returnRepository.createQueryBuilder('return')
+        .leftJoinAndSelect('return.items', 'items')
+        .leftJoinAndSelect('return.payments', 'payments')
+        .leftJoinAndSelect('return.user', 'user')
+        .leftJoinAndSelect('items.warehouse', 'warehouse')
+        .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('return.customer', 'customer');
+
+        // 🔍 Search qo‘shish new added
+        if (search) {
+          query.where(
+            'user.username LIKE :search OR customer.username LIKE :search',
+            { search: `%${search}%`}
+          );
+        }
+
+        const [data, total] = await query
+          .orderBy('return.id', 'DESC')
+          .skip(skip)
+          .take(limit)
+          .getManyAndCount();
+
+        return {
+          meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+          data,
+        };
+      }
 
 
   async findOne(id: number) {

@@ -6,6 +6,7 @@ export class CreatePurchaseDto {
 
     customer_id: number;
     user_id: number;
+    discount:number;
     items: CreatePurchaseItemDto[];
     payments: CreatePaymentDto[];
 }

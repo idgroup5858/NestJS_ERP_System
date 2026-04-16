@@ -25,6 +25,16 @@ export class ReturnController {
       return this.returnService.findAllPag(+page,+limit);
     }
 
+
+    @Get("allpagsearch")
+  findAllPagSearch(
+    @Query("page") page:string,
+    @Query("limit") limit:string,
+    @Query("search") search:string
+  ) {
+    return this.returnService.findAllPagSearch(+page,+limit,search);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.returnService.findOne(+id);

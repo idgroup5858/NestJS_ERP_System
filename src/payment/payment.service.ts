@@ -21,15 +21,39 @@ export class  PaymentService {
 
 
 
-  async create(createPaymentDto: CreatePaymentDto) {
-    const stock = this.paymentRepository.create({
-      ...createPaymentDto,
-      sale:{id:createPaymentDto.sale_id}
-    })
+    async create(dto: CreatePaymentDto) {
 
-    await this.paymentRepository.save(stock);
-    return stock;
+      const pay = new Payment();
+
+      pay.amount = dto.amount;
+      pay.method = dto.method;
+
+      if (dto.sale_id) {
+        pay.sale = { id: dto.sale_id } as any;
+      }
+
+      if (dto.purchase_id) {
+        pay.purchase = { id: dto.purchase_id } as any;
+      }
+
+      if (dto.return_id) {
+        pay.returns = { id: dto.return_id } as any;
+      }
+
+      return await this.paymentRepository.save(pay);
   }
+
+  // async create(createPaymentDto: CreatePaymentDto) {
+  //   const pay = this.paymentRepository.create({
+  //     ...createPaymentDto,
+  //     sale:{id:createPaymentDto.sale_id},
+  //     purchase:{id:createPaymentDto.purchase_id},
+  //     returns:{id:createPaymentDto.return_id}
+  //   })
+
+  //   await this.paymentRepository.save(pay);
+  //   return pay;
+  // }
 
   async createPurchase(createPaymentDto: CreatePaymentDto) {
     const stock = this.paymentRepository.create({
@@ -43,13 +67,13 @@ export class  PaymentService {
   }
 
   async createReturn(createPaymentDto: CreatePaymentDto) {
-    const stock = this.paymentRepository.create({
+    const pay = this.paymentRepository.create({
       ...createPaymentDto,
       returns:{id:createPaymentDto.return_id}
     })
 
-    await this.paymentRepository.save(stock);
-    return stock;
+    await this.paymentRepository.save(pay);
+    return pay;
   }
 
   async findAll() {
