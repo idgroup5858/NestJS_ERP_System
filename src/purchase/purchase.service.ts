@@ -115,7 +115,7 @@ export class PurchaseService {
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('purchase.customer', 'customer');
 
-        // 🔍 Search qo‘shish
+        // 🔍 Search qo‘shish new added
         if (search) {
           query.where(
             'user.username LIKE :search OR customer.username LIKE :search',
