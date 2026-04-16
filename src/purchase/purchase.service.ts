@@ -99,6 +99,47 @@ export class PurchaseService {
   
   
     }
+
+
+    async findAllPagSearch(page: number, limit: number, search?: string) {
+        page = page > 0 ? page : 1;
+        limit = limit > 0 ? limit : 10;
+
+        const skip = (page - 1) * limit;
+
+        const query = this.purchaseRepository.createQueryBuilder('purchase')
+        .leftJoinAndSelect('purchase.items', 'items')
+        .leftJoinAndSelect('purchase.payments', 'payments')
+        .leftJoinAndSelect('purchase.user', 'user')
+        .leftJoinAndSelect('items.warehouse', 'warehouse')
+        .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('purchase.customer', 'customer');
+
+        // 🔍 Search qo‘shish
+        if (search) {
+          query.where(
+            'user.username LIKE :search OR customer.username LIKE :search',
+            { search: `%${search}%`}
+          );
+        }
+
+        const [data, total] = await query
+          .orderBy('purchase.id', 'DESC')
+          .skip(skip)
+          .take(limit)
+          .getManyAndCount();
+
+        return {
+          meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+          data,
+        };
+      }
+
   
   
     async findOne(id: number) {

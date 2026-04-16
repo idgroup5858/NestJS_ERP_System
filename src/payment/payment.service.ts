@@ -4,6 +4,7 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from './entities/payment.entity';
+import { log } from 'console';
 
 @Injectable()
 export class  PaymentService {
@@ -36,8 +37,9 @@ export class  PaymentService {
       purchase:{id:createPaymentDto.purchase_id}
     })
 
-    await this.paymentRepository.save(stock);
-    return stock;
+    const pay=  await this.paymentRepository.save(stock);
+    console.log(pay)
+    return pay;
   }
 
   async createReturn(createPaymentDto: CreatePaymentDto) {

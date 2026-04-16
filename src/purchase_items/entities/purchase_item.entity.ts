@@ -28,6 +28,9 @@ export class PurchaseItem {
         @Column()
         price: number;
 
+        @Column({ default: false })
+        checkPrice: boolean;
+
         @CreateDateColumn()
         date: Date;
 }

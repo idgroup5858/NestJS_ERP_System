@@ -123,7 +123,7 @@ export class SaleService {
 
 
 
-    async findAllPagSearch(page: number, limit: number, search?: string) {
+async findAllPagSearch(page: number, limit: number, search?: string) {
   page = page > 0 ? page : 1;
   limit = limit > 0 ? limit : 10;
 

@@ -25,6 +25,15 @@ export class PurchaseController {
     return this.purchaseService.findAllPag(+page,+limit);
   }
 
+   @Get("allpagsearch")
+  findAllPagSearch(
+    @Query("page") page:string,
+    @Query("limit") limit:string,
+    @Query("search") search:string
+  ) {
+    return this.purchaseService.findAllPagSearch(+page,+limit,search);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.purchaseService.findOne(+id);

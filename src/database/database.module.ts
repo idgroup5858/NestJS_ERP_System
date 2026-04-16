@@ -9,7 +9,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
             host:"localhost",
             port:3306,
             username:"root",
-            password:"root",
+            password:"",
             database:"idgrouperp",
             autoLoadEntities:true,
             synchronize:true
