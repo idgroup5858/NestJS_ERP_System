@@ -25,6 +25,17 @@ export class PaymentController {
     return this.paymentService.findAllPag(+page,+limit);
   }
 
+
+  @Get("allpagsearch")
+  findAllPagSearch(
+    @Query("page") page:string,
+    @Query("limit") limit:string,
+    @Query("search") search:string
+  ) {
+    return this.paymentService.findAllPagSearch(+page,+limit,search);
+  }
+
+
   @Get('getby/:id')
   findOne(@Param('id') id: string) {
     return this.paymentService.findOne(+id);

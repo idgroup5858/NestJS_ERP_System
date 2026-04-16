@@ -78,7 +78,7 @@ export class  PaymentService {
 
   async findAll() {
 
-    return this.paymentRepository.find({relations:["sale","sale.items","sale.items.product","sale.payments"]});
+    return this.paymentRepository.find({relations:["sale","sale.items","sale.items.product","sale.payments","purchase","returns"]});
   }
 
 
@@ -93,7 +93,7 @@ export class  PaymentService {
       skip,
       take: limit,
       order: { id: 'DESC' }, // ixtiyoriy
-      relations:["sale","sale.items","sale.items.product","sale.payments"]
+      relations:["sale","sale.items","sale.items.product","sale.payments","purchase","returns"]
     });
 
     return {
@@ -108,6 +108,72 @@ export class  PaymentService {
 
 
   }
+
+
+  async findAllPagSearch(page: number, limit: number, search?: string) {
+  page = page > 0 ? page : 1;
+  limit = limit > 0 ? limit : 10;
+
+  const skip = (page - 1) * limit;
+
+  const query = this.paymentRepository
+  .createQueryBuilder('payment')
+
+  // Sale relations
+  .leftJoinAndSelect('payment.sale', 'sale')
+  .leftJoinAndSelect('sale.items', 'saleItems')
+  .leftJoinAndSelect('sale.payments', 'salePayments')
+  .leftJoinAndSelect('sale.user', 'saleUser')
+  .leftJoinAndSelect('sale.customer', 'saleCustomer')
+  .leftJoinAndSelect('saleItems.warehouse', 'saleWarehouse')
+  .leftJoinAndSelect('saleItems.product', 'saleProduct')
+
+  // Purchase relations
+  .leftJoinAndSelect('payment.purchase', 'purchase')
+  .leftJoinAndSelect('purchase.items', 'purchaseItems')
+  .leftJoinAndSelect('purchase.payments', 'purchasePayments')
+  .leftJoinAndSelect('purchase.user', 'purchaseUser')
+  .leftJoinAndSelect('purchase.customer', 'purchaseCustomer')
+  .leftJoinAndSelect('purchaseItems.warehouse', 'purchaseWarehouse')
+  .leftJoinAndSelect('purchaseItems.product', 'purchaseProduct')
+
+  // Return relations
+  .leftJoinAndSelect('payment.returns', 'returns')
+  .leftJoinAndSelect('returns.items', 'returnItems')
+  .leftJoinAndSelect('returns.payments', 'returnPayments')
+  .leftJoinAndSelect('returns.user', 'returnUser')
+  .leftJoinAndSelect('returns.customer', 'returnCustomer')
+  .leftJoinAndSelect('returnItems.warehouse', 'returnWarehouse')
+  .leftJoinAndSelect('returnItems.product', 'returnProduct');
+
+    if (search) {
+    query.andWhere(`
+            saleUser.username LIKE :search OR
+            saleCustomer.username LIKE :search OR
+            purchaseUser.username LIKE :search OR
+            purchaseCustomer.username LIKE :search OR
+            returnUser.username LIKE :search OR
+            returnCustomer.username LIKE :search
+          `, {
+        search: `%${search}%`,
+      });
+   }
+  const [data, total] = await query
+    .orderBy('payment.id', 'DESC')
+    .skip(skip)
+    .take(limit)
+    .getManyAndCount();
+
+  return {
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+    data,
+  };
+}
 
 
   async findOne(id: number) {
