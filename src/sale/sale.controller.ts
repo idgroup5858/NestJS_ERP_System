@@ -43,9 +43,29 @@ export class SaleController {
       return this.saleService.findAllWithRange(startDate,endDate);
   }
 
+  @Get("alltoday")
+  findAllToday() {
+    return this.saleService.findTodaySales();
+  }
+
+  @Get("allweek")
+  findThisWeekSales() {
+    return this.saleService.findThisWeekSales();
+  }
+
+   @Get("allmonth")
+  findThisMonthSales() {
+    return this.saleService.findThisMonthSales();
+  }
+
   @Get("all")
   findAll() {
     return this.saleService.findAll();
+  }
+
+  @Get("allpayed")
+  findAllWithTotalPayed() {
+    return this.saleService.findAllWithTotalPayed();
   }
 
   @Get('getby/:id')

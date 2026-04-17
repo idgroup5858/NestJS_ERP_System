@@ -72,8 +72,32 @@ export class SaleService {
 
   async findAll() {
 
-    return this.saleRepository.find();//{ relations: ["items", "payments", "items.product", "customer", "user"] }
+    return this.saleRepository.find({
+      relations: ["items", "payments", "items.product", "customer", "user"]
+    });
   }
+  async findAllWithTotalPayed() {
+  const sales = await this.saleRepository.find({
+    relations: [
+      "items",
+      "payments",
+      "items.product",
+      "customer",
+      "user"
+    ]
+  });
+
+  return sales.map((sale) => {
+    const totalPaid = sale.payments?.reduce((sum, p) => {
+      return sum + Number(p.amount || 0);
+    }, 0);
+
+    return {
+      ...sale,
+      totalPaid,
+    };
+  });
+}
 
 
   async findAllWithRange(startDate:string,endDate:string){
@@ -91,6 +115,62 @@ export class SaleService {
 
     return result;
   }
+
+
+  async findTodaySales() {
+      const start = new Date();
+      const end = new Date();
+
+      start.setHours(0, 0, 0, 0);       // bugun 00:00:00
+      end.setHours(23, 59, 59, 999);    // bugun 23:59:59
+
+      const result = await this.saleRepository.find({
+        where: {
+          date: Between(start, end),
+        },
+        // relations: ["items", "payments", "items.product", "customer", "user"]
+      });
+
+      return result;
+  }
+
+  async findThisWeekSales() {
+      const now = new Date();
+      const start = new Date(now);
+
+      const day = now.getDay(); // Yakshanba=0, Dushanba=1 ...
+      const diff = day === 0 ? 6 : day - 1; 
+      // Agar yakshanba bo‘lsa 6 kun orqaga, aks holda day-1
+
+      start.setDate(now.getDate() - diff);
+      start.setHours(0, 0, 0, 0);
+
+      const result = await this.saleRepository.find({
+        where: {
+          date: Between(start, now),
+        },
+        // relations: ["items", "payments", "items.product", "customer", "user"]
+      });
+
+      return result;
+    }
+
+
+  async findThisMonthSales() {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        start.setHours(0, 0, 0, 0);
+
+        const result = await this.saleRepository.find({
+          where: {
+            date: Between(start, now),
+          },
+          relations: ["items", "payments", "items.product", "customer", "user"]
+        });
+
+    return result;
+}
 
 
   async findAllPag(page: number, limit: number) {
