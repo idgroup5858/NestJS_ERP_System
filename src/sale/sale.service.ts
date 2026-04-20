@@ -72,11 +72,12 @@ export class SaleService {
 
   async findAll() {
 
-    return this.saleRepository.find({
+   return this.saleRepository.find({
       relations: ["items", "payments", "items.product", "customer", "user"]
     });
   }
-  async findAllWithTotalPayed() {
+
+  async findAllWithTotalDebt() {
   const sales = await this.saleRepository.find({
     relations: [
       "items",
@@ -87,7 +88,9 @@ export class SaleService {
     ]
   });
 
-  return sales.map((sale) => {
+  return sales.filter((sale) => (
+    sale.total >sale.payments?.reduce((sum, p) =>( sum + Number(p.amount || 0)), 0)+sale.discount
+  )).map((sale) => {
     const totalPaid = sale.payments?.reduce((sum, p) => {
       return sum + Number(p.amount || 0);
     }, 0);

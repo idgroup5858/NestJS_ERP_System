@@ -63,9 +63,9 @@ export class SaleController {
     return this.saleService.findAll();
   }
 
-  @Get("allpayed")
+  @Get("alldebt")
   findAllWithTotalPayed() {
-    return this.saleService.findAllWithTotalPayed();
+    return this.saleService.findAllWithTotalDebt();
   }
 
   @Get('getby/:id')
