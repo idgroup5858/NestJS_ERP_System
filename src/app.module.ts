@@ -18,12 +18,18 @@ import { ReturnModule } from './return/return.module';
 import { ReturnItemsModule } from './return_items/return_items.module';
 import { TaskPipelineModule } from './task_pipeline/task_pipeline.module';
 import { TaskModule } from './task/task.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [CustomerModule, UserModule, WarehouseModule, ProductModule, SaleModule, StockModule, PaymentModule, SaleItemsModule, DatabaseModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
     }),
     CategoryModule,
     PurchaseModule,

@@ -5,6 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { Repository } from 'typeorm';
 import { CategoryService } from 'src/category/category.service';
+import path from 'path';
+import * as fs from 'fs';
 
 @Injectable()
 export class ProductService {
@@ -122,6 +124,7 @@ export class ProductService {
     return checkProduct;
   }
 
+
   async update(id: number, updateProductDto: UpdateProductDto) {
     const checkProduct = await this.productRepository.findOneBy({ id });
     if (!checkProduct) throw new NotFoundException("Не найден Продукт");
@@ -140,13 +143,85 @@ export class ProductService {
     return product;
   }
 
-  async remove(id: number) {
-    const checkProduct = await this.productRepository.findOneBy({ id });
-    if (!checkProduct) throw new NotFoundException("Не найден Продукт");
-    await this.productRepository.remove(checkProduct)
-    return { message: "Продукт удален" }
 
-  }
+  async updatewithImage(
+        id: number,
+        updateProductDto: UpdateProductDto,
+        file?: Express.Multer.File,
+      ) {
+        const checkProduct = await this.productRepository.findOneBy({ id });
 
+        if (!checkProduct) {
+          throw new NotFoundException('Не найден Продукт');
+        }
+
+        // 1. eski rasmni saqlab qolamiz
+        const oldImageUrl = checkProduct.imgUrl;
+
+        const baseUrl = `http://109.196.103.18:3000`;
+
+        const product = await this.productRepository.preload({
+          id,
+          ...updateProductDto,
+          imgUrl: file
+            ? `${baseUrl}/uploads/${file.filename}`
+            : oldImageUrl,
+        });
+
+        if (!product) {
+          throw new NotFoundException();
+        }
+
+        await this.productRepository.save(product);
+
+        // 2. agar yangi rasm yuklangan bo‘lsa → eski rasmni o‘chiramiz
+        if (file && oldImageUrl) {
+          const fileName = oldImageUrl.split('/').pop();
+
+          if (fileName) {
+            const filePath = path.join(process.cwd(), 'uploads', fileName);
+
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+        }
+
+        return product;
+      }
+  // async remove(id: number) {
+  //   const checkProduct = await this.productRepository.findOneBy({ id });
+  //   if (!checkProduct) throw new NotFoundException("Не найден Продукт");
+  //   await this.productRepository.remove(checkProduct)
+  //   return { message: "Продукт удален" }
+
+  // }
+
+  
+      async remove(id: number) {
+        const checkProduct = await this.productRepository.findOneBy({ id });
+
+        if (!checkProduct) {
+          throw new NotFoundException("Не найден Продукт");
+        }
+
+        // 1. image o‘chirish (xavfsiz variant)
+        if (checkProduct.imgUrl) {
+          const fileName = checkProduct.imgUrl.split('/').pop();
+
+          if (fileName) {
+            const filePath = path.join(process.cwd(), 'uploads', fileName);
+
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+        }
+
+        // 2. product o‘chirish
+        await this.productRepository.remove(checkProduct);
+
+        return { message: "Продукт удален" };
+      }
 
 }

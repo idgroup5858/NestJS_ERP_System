@@ -40,12 +40,19 @@
 
 
 
+
+
+
             npm install
             npm run build
             sudo npm install -g pm2
             pm2 start dist/main.js --name nest-app
 
             
+
+            
+            npm install @nestjs/platform-express multer
+            npm install @nestjs/serve-static
 
 
 

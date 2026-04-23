@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import { IsNumber, IsOptional, IsString } from "class-validator";
 import { Category } from "src/category/entities/category.entity";
 
@@ -12,12 +13,19 @@ export class CreateProductDto {
         barCode:string;
         @IsOptional()
         imgUrl:string;
+
+        @Type(() => Number)
         @IsNumber()
-        price:number;
+        price: number;
+
+        @Type(() => Number)
         @IsNumber()
-        bulkPrice:number;
+        bulkPrice: number;
+
+        @Type(() => Number)
         @IsNumber()
-        buyPrice:number;
+        buyPrice: number;
+
         @IsNumber()
         categoryId:number;
         @IsString()
