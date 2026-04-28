@@ -2,7 +2,8 @@ import { Purchase } from "src/purchase/entities/purchase.entity";
 import { Return } from "src/return/entities/return.entity";
 import { Sale } from "src/sale/entities/sale.entity";
 import { Task } from "src/task/entities/task.entity";
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Telegram } from "src/telegram/entities/telegram.entity";
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
 @Entity("user")
@@ -32,6 +33,10 @@ export class User {
     @Column({default:null})
     imgUrl: string;
 
+    @Column({default:null})
+    telegramAccountId: number;
+    
+
     @OneToMany(() => Sale, sale => sale.user)
     sale:Sale[];
 
@@ -48,6 +53,10 @@ export class User {
 
     @OneToMany(() => Task, assignedTasks => assignedTasks.assigned)
     assignedTasks:Task[]
+
+
+    @ManyToOne(() => Telegram , telegam => telegam.user)
+    telegram: Telegram;
 
     @CreateDateColumn()
     createdAt: Date;

@@ -8,6 +8,8 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login-user.dto';
 import { JwtService } from '@nestjs/jwt';
+import { TgUpdateDto } from './dto/TgUpdateDto';
+import { TelegramService } from 'src/telegram/telegram.service';
 
 @Injectable()
 export class UserService {
@@ -16,6 +18,7 @@ export class UserService {
     @InjectRepository(User)
     private readonly userRepository:Repository<User>,
     private readonly jwtService:JwtService,
+    private readonly telegramService:TelegramService,
   ) {}
 
   async create(createUserDto: CreateUserDto) {
@@ -142,6 +145,17 @@ export class UserService {
     await this.userRepository.save(user) 
 
     return user;
+  }
+
+  async updateTg(id:number,tgUpdateDto:TgUpdateDto){
+     const checkUser = await this.userRepository.findOneBy({id});
+     if(!checkUser) throw new NotFoundException("Не найден сотрудник");
+     
+     const telegram = await this.telegramService.findOne(tgUpdateDto.botId);
+     if(!telegram) throw new NotFoundException("Не найден bot");
+
+     checkUser.telegram=telegram
+     return  this.userRepository.save(checkUser); 
   }
 
   async remove(id: number) {

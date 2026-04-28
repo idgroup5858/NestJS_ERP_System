@@ -6,9 +6,10 @@ import { User } from './entities/user.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './jwt.strategy';
+import { TelegramModule } from 'src/telegram/telegram.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User]),
+  imports: [TypeOrmModule.forFeature([User]),TelegramModule,
   JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

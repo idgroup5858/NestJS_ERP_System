@@ -20,6 +20,7 @@ import { TaskPipelineModule } from './task_pipeline/task_pipeline.module';
 import { TaskModule } from './task/task.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [CustomerModule, UserModule, WarehouseModule, ProductModule, SaleModule, StockModule, PaymentModule, SaleItemsModule, DatabaseModule,
@@ -38,6 +39,7 @@ import { join } from 'path';
     ReturnItemsModule,
     TaskPipelineModule,
     TaskModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [AppService],

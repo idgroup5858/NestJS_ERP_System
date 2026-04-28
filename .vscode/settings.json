@@ -47,7 +47,9 @@
         "src/task/task.service.spec.ts": true,
         "src/task_pipeline/task_pipeline.controller.spec.ts": true,
         "src/task_pipeline/task_pipeline.service.spec.ts": true,
-        "nest-cli.json": true
+        "nest-cli.json": true,
+        "src/telegram/telegram.controller.spec.ts": true,
+        "src/telegram/telegram.service.spec.ts": true
     },
     "hide-files.files": [
         "tsconfig.build.json",
@@ -92,6 +94,8 @@
         "src/task/task.service.spec.ts",
         "src/task_pipeline/task_pipeline.controller.spec.ts",
         "src/task_pipeline/task_pipeline.service.spec.ts",
-        "nest-cli.json"
+        "nest-cli.json",
+        "src/telegram/telegram.controller.spec.ts",
+        "src/telegram/telegram.service.spec.ts"
     ]
 }

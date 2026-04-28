@@ -4,6 +4,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { LoginDto } from './dto/login-user.dto';
 import { AuthGuard } from '@nestjs/passport'; 
+import { TgUpdateDto } from './dto/TgUpdateDto';
 
 
 @Controller('user')
@@ -31,7 +32,7 @@ export class UserController {
     return this.userService.findAllPag(+page,+limit);
   }
 
-   @Get("allpagsearch")
+  @Get("allpagsearch")
   findAllPagSearch(
     @Query("page") page:string,
     @Query("limit") limit:string,
@@ -52,6 +53,12 @@ export class UserController {
   @Patch('update/:id')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.userService.update(+id, updateUserDto);
+  }
+
+
+  @Patch('updatetg/:id')
+  updatetg(@Param('id') id: string, @Body() tgupdateDto: TgUpdateDto) {
+    return this.userService.updateTg(+id, tgupdateDto);
   }
 
   @Delete('delete/:id')
