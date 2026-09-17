@@ -158,7 +158,7 @@ export class ProductService {
         // 1. eski rasmni saqlab qolamiz
         const oldImageUrl = checkProduct.imgUrl;
 
-        const baseUrl = `http://109.196.103.18:3000`;
+        const baseUrl = `http://localhost:3000`;
 
         const product = await this.productRepository.preload({
           id,
