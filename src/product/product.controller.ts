@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseIntercepto
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { ImportProductDto } from './dto/import-product.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 
@@ -12,6 +13,15 @@ export class ProductController {
   @Post("add")
   create(@Body() createProductDto: CreateProductDto) {
     return this.productService.create(createProductDto);
+  }
+
+  @Post("import")
+  importMany(@Body() importProductDto: ImportProductDto) {
+    return this.productService.importMany(
+      importProductDto.items,
+      importProductDto.createMissingCategories,
+      importProductDto.warehouseId
+    );
   }
 
   @Get("all")

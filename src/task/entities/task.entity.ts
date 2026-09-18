@@ -27,7 +27,7 @@ export class Task {
     assigned: User;
 
 
-    @Column({ type: 'datetime', nullable: true })
+    @Column({ type: 'timestamp', nullable: true })
     dueDate: Date;
 
     @UpdateDateColumn()

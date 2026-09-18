@@ -1,9 +1,10 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { ImportCustomerItemDto } from './dto/import-customer.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Customer } from './entities/customer.entity';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 @Injectable()
 export class CustomerService {
@@ -27,6 +28,81 @@ export class CustomerService {
     return customer;
   }
 
+  /**
+   * Excel/CSV dan ommaviy import. Bitta buzuq qator butun paketni
+   * yiqitmaydi: har bir qator alohida tekshiriladi va xatolar roʻyxati
+   * qator raqami bilan qaytariladi. Mavjud telefonlar bitta soʻrovda
+   * tekshiriladi, yozish esa bitta `save()` da (TypeOrm uni tranzaksiyaga oʻraydi).
+   */
+  async importMany(items: ImportCustomerItemDto[]) {
+
+    const errors: { index: number, message: string }[] = [];
+    const prepared: { index: number, customer: Customer }[] = [];
+    const seenPhones = new Set<string>();
+
+    items.forEach((item, index) => {
+
+      const username = `${item?.username ?? ''}`.trim();
+      const surname = `${item?.surname ?? ''}`.trim();
+      const phone = `${item?.phone ?? ''}`.trim();
+
+      if (!username || !surname || !phone) {
+        errors.push({ index, message: "Заполнены не все обязательные поля" });
+        return;
+      }
+
+      if (seenPhones.has(phone)) {
+        errors.push({ index, message: "Дубликат телефона в файле" });
+        return;
+      }
+      seenPhones.add(phone);
+
+      prepared.push({
+        index,
+        customer: this.customerRepository.create({ username, surname, phone, type: "user" })
+      });
+    });
+
+    const toSave: { index: number, customer: Customer }[] = [];
+    let created = 0;
+
+    if (prepared.length > 0) {
+
+      const existing = await this.customerRepository.find({
+        where: { phone: In([...seenPhones]) }
+      });
+      const existingPhones = new Set(existing.map(customer => customer.phone));
+
+      for (const row of prepared) {
+        if (existingPhones.has(row.customer.phone)) {
+          errors.push({ index: row.index, message: "Клиент с таким телефоном уже существует" });
+        } else {
+          toSave.push(row);
+        }
+      }
+
+      if (toSave.length > 0) {
+        try {
+          await this.customerRepository.save(toSave.map(row => row.customer));
+          created = toSave.length;
+        } catch (exception) {
+          // `save()` tranzaksiya, shuning uchun kutilmagan baza xatosida butun
+          // paket yozilmaydi. Ochiq 500 qaytarish oʻrniga qaysi qatorlar
+          // oʻtmaganini koʻrsatamiz — import qolgan paketlarni davom ettiradi.
+          const message = exception instanceof Error ? exception.message : "Ошибка базы данных";
+          for (const row of toSave) errors.push({ index: row.index, message });
+        }
+      }
+    }
+
+    return {
+      total: items.length,
+      created,
+      failed: errors.length,
+      errors: errors.sort((a, b) => a.index - b.index)
+    };
+  }
+
   async findAll() {
 
     return this.customerRepository.find({
@@ -45,7 +121,7 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
   // 🔍 Search qo‘shish
   if (search) {
     query.where(
-      'customer.username LIKE :search OR customer.phone LIKE :search',
+      'customer.username ILIKE :search OR customer.surname ILIKE :search OR customer.phone ILIKE :search',
       { search: `%${search}%` }
     );
   }

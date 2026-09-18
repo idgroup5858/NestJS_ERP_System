@@ -5,12 +5,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
     imports:[
         TypeOrmModule.forRoot({
-            type:"mysql",
-            host:"127.0.1.31",
-            port:3306,
-            username:"root",
-            password:"",
-            database:"idgrouperp",
+            type:"postgres",
+            host: process.env.DB_HOST ?? "localhost",
+            port: Number(process.env.DB_PORT ?? 5433),
+            username: process.env.DB_USER ?? "postgres",
+            password: process.env.DB_PASSWORD ?? "root",
+            database: process.env.DB_NAME ?? "idgrouperp",
             autoLoadEntities:true,
             synchronize:true
         })

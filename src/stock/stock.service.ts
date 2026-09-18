@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateStockDto } from './dto/create-stock.dto';
 import { UpdateStockDto } from './dto/update-stock.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,6 +15,37 @@ export class StockService {
     private readonly productService: ProductService,
     private readonly wareHouseService:WarehouseService,
   ) {}
+
+  /** Har bir qator uchun ombor yozuvi borligini (va kerak boʻlsa yetarli qoldiqni) tekshiradi. */
+  async assertAvailable(
+    items: { product_id: number, warehouse_id: number, quantity: number }[],
+    requireQuantity: boolean
+  ) {
+    if (!items?.length) throw new BadRequestException('Корзина пуста');
+
+    const needed = new Map<string, number>();
+    for (const item of items) {
+      if (!item.warehouse_id) throw new BadRequestException('Товар не привязан к складу');
+      if (!(item.quantity > 0)) throw new BadRequestException('Неверное количество');
+      const key = `${item.product_id}:${item.warehouse_id}`;
+      needed.set(key, (needed.get(key) ?? 0) + item.quantity);
+    }
+
+    for (const [key, quantity] of needed) {
+      const [productId, warehouseId] = key.split(':').map(Number);
+      const stock = await this.stocRepository.findOne({
+        where: { product: { id: productId }, warehouse: { id: warehouseId } },
+        relations: ['product'],
+      });
+
+      if (!stock) throw new BadRequestException('Не найден остаток');
+      if (requireQuantity && stock.quantity < quantity) {
+        throw new BadRequestException(
+          `Недостаточно товара «${stock.product.name}» на складе: доступно ${stock.quantity}`
+        );
+      }
+    }
+  }
 
   async create(createStockDto: CreateStockDto) {
     await this.productService.findOne(createStockDto.product_id);
@@ -78,7 +109,7 @@ export class StockService {
   // 🔍 Search qo‘shish
   if (search) {
     query.where(
-      'product.name LIKE :search OR product.barCode LIKE :search',
+      'product.name ILIKE :search OR product.barCode ILIKE :search',
       { search: `%${search}%` }
     );
   }

@@ -29,11 +29,13 @@ export class ReturnService {
       total += item.quantity * item.price;
     }
 
+    await this.stockService.assertAvailable(createReturnsDto.items, false);
+
     const returns = this.returnRepository.create({
-      customer: { id: createReturnsDto.customer_id },
+      customer: createReturnsDto.customer_id ? { id: createReturnsDto.customer_id } : undefined,
       user: { id: createReturnsDto.user_id },
       total,
-      discount:createReturnsDto.discount
+      discount: Math.round(Number(createReturnsDto.discount) || 0)
     });
 
     await this.returnRepository.save(returns);
@@ -121,7 +123,7 @@ export class ReturnService {
         // 🔍 Search qo‘shish new added
         if (search) {
           query.where(
-            'user.username LIKE :search OR customer.username LIKE :search',
+            'user.username ILIKE :search OR customer.username ILIKE :search',
             { search: `%${search}%`}
           );
         }

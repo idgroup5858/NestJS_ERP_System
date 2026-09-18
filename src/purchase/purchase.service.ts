@@ -29,11 +29,13 @@ export class PurchaseService {
         total += item.quantity * item.price;
       }
   
+      await this.stockService.assertAvailable(createPurchaseDto.items, false);
+
       const purchase = this.purchaseRepository.create({
-        customer: { id: createPurchaseDto.customer_id },
+        customer: createPurchaseDto.customer_id ? { id: createPurchaseDto.customer_id } : undefined,
         user: { id: createPurchaseDto.user_id },
         total,
-        discount:createPurchaseDto.discount
+        discount: Math.round(Number(createPurchaseDto.discount) || 0)
       });
   
       await this.purchaseRepository.save(purchase);
@@ -119,7 +121,7 @@ export class PurchaseService {
         // 🔍 Search qo‘shish new added
         if (search) {
           query.where(
-            'user.username LIKE :search OR customer.username LIKE :search',
+            'user.username ILIKE :search OR customer.username ILIKE :search',
             { search: `%${search}%`}
           );
         }

@@ -1,4 +1,4 @@
-import {  Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { Sale } from './entities/sale.entity';
@@ -7,6 +7,9 @@ import { Between, Repository } from 'typeorm';
 import { SaleItemsService } from 'src/sale_items/sale_items.service';
 import { PaymentService } from 'src/payment/payment.service';
 import { StockService } from 'src/stock/stock.service';
+
+/** Savdoda chegirma umumiy summaning shu foizidan oshmasligi kerak. */
+const MAX_SALE_DISCOUNT_PERCENT = 20;
 
 @Injectable()
 export class SaleService {
@@ -29,14 +32,20 @@ export class SaleService {
       total += item.quantity * item.price;
     }
 
-    console.log(total);
-    
+    const discount = Math.round(Number(createSaleDto.discount) || 0);
+    if (discount < 0 || discount > Math.floor(total * MAX_SALE_DISCOUNT_PERCENT / 100)) {
+      throw new BadRequestException(`Скидка не может превышать ${MAX_SALE_DISCOUNT_PERCENT}% суммы продажи`);
+    }
+
+    // Sotuv tranzaksiyasiz yoziladi, shuning uchun qoldiq keyinroq topilmasa
+    // sotuv yarim-yozilgan holda qolmasligi uchun avval tekshiriladi.
+    await this.stockService.assertAvailable(createSaleDto.items, true);
 
     const sale = this.saleRepository.create({
-      customer: { id: createSaleDto.customer_id },
+      customer: createSaleDto.customer_id ? { id: createSaleDto.customer_id } : undefined,
       user: { id: createSaleDto.user_id },
       total,
-      discount:createSaleDto.discount
+      discount
     });
 
     await this.saleRepository.save(sale);
@@ -223,7 +232,7 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
   // 🔍 Search qo‘shish
   if (search) {
     query.where(
-      'user.username LIKE :search OR customer.username LIKE :search',
+      'user.username ILIKE :search OR customer.username ILIKE :search',
       { search: `%${search}%`}
     );
   }

@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { ImportCustomerDto } from './dto/import-customer.dto';
 
 @Controller('customer')
 export class CustomerController {
@@ -10,6 +11,11 @@ export class CustomerController {
   @Post("add")
   create(@Body() createCustomerDto: CreateCustomerDto) {
     return this.customerService.create(createCustomerDto);
+  }
+
+  @Post("import")
+  importMany(@Body() importCustomerDto: ImportCustomerDto) {
+    return this.customerService.importMany(importCustomerDto.items);
   }
 
   @Get("all")

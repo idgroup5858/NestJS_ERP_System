@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { ImportCategoryDto } from './dto/import-category.dto';
 
 @Controller('category')
 export class CategoryController {
@@ -10,6 +11,11 @@ export class CategoryController {
   @Post("add")
   create(@Body() createCategoryDto: CreateCategoryDto) {
     return this.categoryService.create(createCategoryDto);
+  }
+
+  @Post("import")
+  importMany(@Body() importCategoryDto: ImportCategoryDto) {
+    return this.categoryService.importMany(importCategoryDto.items);
   }
 
   @Get("all")

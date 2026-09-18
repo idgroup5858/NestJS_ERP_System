@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, UnauthorizedException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,7 +12,7 @@ import { TgUpdateDto } from './dto/TgUpdateDto';
 import { TelegramService } from 'src/telegram/telegram.service';
 
 @Injectable()
-export class UserService {
+export class UserService implements OnApplicationBootstrap {
 
   constructor(
     @InjectRepository(User)
@@ -20,6 +20,22 @@ export class UserService {
     private readonly jwtService:JwtService,
     private readonly telegramService:TelegramService,
   ) {}
+
+  // Faqat bazada birorta xodim boʻlmaganda: aks holda email/parol oʻzgartirilgach,
+  // maʼlum parolli admin har ishga tushishda qayta paydo boʻlib qolardi.
+  async onApplicationBootstrap() {
+    if (await this.userRepository.count() > 0) return;
+
+    await this.userRepository.save(this.userRepository.create({
+      username: "Admin",
+      surname: "Admin",
+      phone: "",
+      email: "admin@gmail.com",
+      password: await bcrypt.hash("admin", 10),
+      role: "Admin",
+    }));
+    new Logger(UserService.name).log("Default admin created: admin@gmail.com");
+  }
 
   async create(createUserDto: CreateUserDto) {
      const checkUser = await this.userRepository.findOne({
@@ -59,7 +75,7 @@ export class UserService {
   // 🔍 Search qo‘shish
   if (search) {
     query.where(
-      'user.username LIKE :search OR user.email LIKE :search',
+      'user.username ILIKE :search OR user.email ILIKE :search',
       { search: `%${search}%` }
     );
   }

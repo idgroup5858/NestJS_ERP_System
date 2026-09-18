@@ -148,12 +148,12 @@ export class  PaymentService {
 
     if (search) {
     query.andWhere(`
-            saleUser.username LIKE :search OR
-            saleCustomer.username LIKE :search OR
-            purchaseUser.username LIKE :search OR
-            purchaseCustomer.username LIKE :search OR
-            returnUser.username LIKE :search OR
-            returnCustomer.username LIKE :search
+            saleUser.username ILIKE :search OR
+            saleCustomer.username ILIKE :search OR
+            purchaseUser.username ILIKE :search OR
+            purchaseCustomer.username ILIKE :search OR
+            returnUser.username ILIKE :search OR
+            returnCustomer.username ILIKE :search
           `, {
         search: `%${search}%`,
       });
