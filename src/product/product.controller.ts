@@ -41,9 +41,10 @@ export class ProductController {
   findAllPagSearch(
     @Query("page") page:string,
     @Query("limit") limit:string,
-    @Query("search") search:string
+    @Query("search") search:string,
+    @Query("categoryId") categoryId?:string
   ) {
-    return this.productService.findAllPagSearch(+page,+limit,search);
+    return this.productService.findAllPagSearch(+page,+limit,search,+(categoryId ?? 0) || undefined);
   }
 
   @Get('getby/:id')

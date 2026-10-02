@@ -29,14 +29,21 @@ export class ProductService {
     const checkCategory = await this.categoryService.findOne(createProductDto.categoryId)
     if (!checkCategory) throw new ConflictException("Категория не найден !")
 
-    const existingProduct = await this.productRepository.findOne({
-      where: { barCode: createProductDto.barCode },
-    });
-    if (existingProduct) throw new ConflictException("Штрих код уже ест !");
+    // Shtrixkod ixtiyoriy. Boʻsh qiymat NULL boʻlib yoziladi: `unique` ustunda
+    // bir nechta NULL ruxsat etiladi, boʻsh satr esa ikkinchi mahsulotda yiqiladi.
+    const barCode = `${createProductDto.barCode ?? ''}`.trim() || null;
+
+    if (barCode) {
+      const existingProduct = await this.productRepository.findOne({
+        where: { barCode },
+      });
+      if (existingProduct) throw new ConflictException("Штрих код уже ест !");
+    }
 
     const product = this.productRepository.create(
       {
         ...createProductDto,
+        barCode: barCode as string,
         category: { id: createProductDto.categoryId }
       }
     )
@@ -236,7 +243,7 @@ export class ProductService {
     return this.productRepository.find({ relations: ['category', "stock", "stock.warehouse"] });
   }
 
-  async findAllPagSearch(page: number, limit: number, search?: string) {
+  async findAllPagSearch(page: number, limit: number, search?: string, categoryId?: number) {
   page = page > 0 ? page : 1;
   limit = limit > 0 ? limit : 10;
 
@@ -249,10 +256,15 @@ export class ProductService {
 
   // 🔍 Search qo‘shish
   if (search) {
-    query.where(
-      'product.name ILIKE :search OR product.barCode ILIKE :search',
+    // Qavs shart: aks holda OR kategoriya filtrini chetlab oʻtadi.
+    query.andWhere(
+      '(product.name ILIKE :search OR product.barCode ILIKE :search)',
       { search: `%${search}%` }
     );
+  }
+
+  if (categoryId) {
+    query.andWhere('category.id = :categoryId', { categoryId });
   }
 
   const [data, total] = await query
