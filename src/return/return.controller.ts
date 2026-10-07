@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { ReturnService } from './return.service';
 import { CreateReturnDto } from './dto/create-return.dto';
+import { ReturnFromSaleDto } from './dto/return-from-sale.dto';
 import { UpdateReturnDto } from './dto/update-return.dto';
 
 @Controller('return')
@@ -10,6 +11,11 @@ export class ReturnController {
   @Post("addfull")
   create(@Body() createReturnDto: CreateReturnDto) {
     return this.returnService.createFullReturns(createReturnDto);
+  }
+
+  @Post("fromsale")
+  createFromSale(@Body() returnFromSaleDto: ReturnFromSaleDto) {
+    return this.returnService.createFromSale(returnFromSaleDto);
   }
 
   @Get("all")

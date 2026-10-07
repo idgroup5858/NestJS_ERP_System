@@ -73,6 +73,11 @@ export class SaleController {
     return this.saleService.findOne(+id);
   }
 
+  @Get('detail/:id')
+  findDetail(@Param('id') id: string) {
+    return this.saleService.findDetail(+id);
+  }
+
   // @Patch('update/:id')
   // update(@Param('id') id: string, @Body() updateSaleDto: UpdateSaleDto) {
   //   return this.saleService.update(+id, updateSaleDto);

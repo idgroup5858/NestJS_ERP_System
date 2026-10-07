@@ -6,9 +6,10 @@ import { Return } from './entities/return.entity';
 import { ReturnItemsModule } from 'src/return_items/return_items.module';
 import { PaymentModule } from 'src/payment/payment.module';
 import { StockModule } from 'src/stock/stock.module';
+import { TelegramModule } from 'src/telegram/telegram.module';
 
 @Module({
-  imports:[ReturnItemsModule,PaymentModule,StockModule,TypeOrmModule.forFeature([Return])],
+  imports:[ReturnItemsModule,PaymentModule,StockModule,TelegramModule,TypeOrmModule.forFeature([Return])],
   controllers: [ReturnController],
   providers: [ReturnService],
 })

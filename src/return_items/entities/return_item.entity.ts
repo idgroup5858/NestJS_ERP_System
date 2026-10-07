@@ -1,6 +1,7 @@
 import { Product } from "src/product/entities/product.entity";
 import { Purchase } from "src/purchase/entities/purchase.entity";
 import { Return } from "src/return/entities/return.entity";
+import { SaleItem } from "src/sale_items/entities/sale_item.entity";
 import { Warehouse } from "src/warehouse/entities/warehouse.entity";
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 
@@ -22,6 +23,11 @@ export class ReturnItem {
 
     @ManyToOne(() => Warehouse)
     warehouse: Warehouse;
+
+    // Qaysi savdo qatoridan qaytarilgan — bitta qatorni sotilganidan
+    // koʻp qaytarib boʻlmasligi shu orqali tekshiriladi.
+    @ManyToOne(() => SaleItem, saleItem => saleItem.returnItems, { nullable: true, onDelete: "SET NULL" })
+    saleItem: SaleItem;
 
     @Column()
     quantity: number;

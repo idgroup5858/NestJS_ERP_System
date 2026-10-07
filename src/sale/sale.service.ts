@@ -7,6 +7,7 @@ import { Between, Repository } from 'typeorm';
 import { SaleItemsService } from 'src/sale_items/sale_items.service';
 import { PaymentService } from 'src/payment/payment.service';
 import { StockService } from 'src/stock/stock.service';
+import { TelegramBotService } from 'src/telegram/telegram-bot.service';
 
 /** Savdoda chegirma umumiy summaning shu foizidan oshmasligi kerak. */
 const MAX_SALE_DISCOUNT_PERCENT = 20;
@@ -19,7 +20,8 @@ export class SaleService {
     private readonly saleRepository: Repository<Sale>,
     private readonly saleItemsService: SaleItemsService,
     private readonly paymentService: PaymentService,
-    private readonly stockService: StockService
+    private readonly stockService: StockService,
+    private readonly telegramBot: TelegramBotService
 
   ) { }
 
@@ -69,6 +71,8 @@ export class SaleService {
       await this.stockService.updateFilter(item)
     }
 
+    // Telegram ga (javobni kutmasdan — internet boʻlmasa ham savdo oʻtadi).
+    this.telegramBot.notifySale(sale.id);
 
     return this.saleRepository.findOne({
       where: { id: sale.id },
@@ -261,6 +265,31 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
     if (!checkSale) throw new NotFoundException("Не найден Прдоажа");
 
     return checkSale;
+  }
+
+  /**
+   * Savdo tafsiloti: har bir qatordan qancha qaytarilgani (`returned`) va
+   * qaytarishlarning chegirmadan keyingi jami summasi (`returnedTotal`) bilan.
+   */
+  async findDetail(id: number) {
+
+    const sale = await this.saleRepository.findOne({
+      where: { id },
+      relations: ["items", "items.product", "items.warehouse", "items.returnItems", "payments", "customer", "user", "returns"],
+      order: { items: { id: "ASC" }, payments: { id: "ASC" } }
+    });
+    if (!sale) throw new NotFoundException("Не найден Прдоажа");
+
+    const { items, returns, ...rest } = sale;
+
+    return {
+      ...rest,
+      items: items.map(({ returnItems, ...item }) => ({
+        ...item,
+        returned: returnItems.reduce((sum, r) => sum + r.quantity, 0)
+      })),
+      returnedTotal: returns.reduce((sum, r) => sum + r.total - r.discount, 0)
+    };
   }
 
   // async update(id: number, updateSaleDto: UpdateSaleDto) {

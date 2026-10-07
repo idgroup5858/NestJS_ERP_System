@@ -1,12 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateReturnDto } from './dto/create-return.dto';
+import { ReturnFromSaleDto } from './dto/return-from-sale.dto';
 import { UpdateReturnDto } from './dto/update-return.dto';
 import { UpdateSaleDto } from 'src/sale/dto/update-sale.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Return } from './entities/return.entity';
+import { ReturnItem } from 'src/return_items/entities/return_item.entity';
+import { Sale } from 'src/sale/entities/sale.entity';
+import { SaleItem } from 'src/sale_items/entities/sale_item.entity';
+import { Payment } from 'src/payment/entities/payment.entity';
+import { OFFSET_METHOD } from 'src/payment/payment-methods';
+import { Stock } from 'src/stock/entities/stock.entity';
 import { ReturnItemsService } from 'src/return_items/return_items.service';
 import { PaymentService } from 'src/payment/payment.service';
 import { StockService } from 'src/stock/stock.service';
+import { TelegramBotService } from 'src/telegram/telegram-bot.service';
 import { Repository } from 'typeorm';
 
 @Injectable()
@@ -16,9 +24,118 @@ export class ReturnService {
     private readonly returnRepository: Repository<Return>,
     private readonly returnItemsService: ReturnItemsService,
     private readonly paymentService: PaymentService,
-    private readonly stockService: StockService
+    private readonly stockService: StockService,
+    private readonly telegramBot: TelegramBotService
 
   ) { }
+
+
+  /**
+   * Список продаж ichidan, aniq savdo qatorlari boʻyicha qaytarish.
+   *
+   * - Har bir qatordan sotilganidan (oldingi qaytarishlarni ayirib) koʻp qaytarib boʻlmaydi.
+   * - Narx — savdodagi narx; savdo chegirmasi mutanosib taqsimlanadi.
+   * - Savdoda qarz qolgan boʻlsa, summa avval qarzdan ayiriladi, qolgani
+   *   mijozga `method` usulida qaytariladi.
+   *
+   * Qaytarish, tovarning omborga qaytishi va toʻlovlar bitta tranzaksiyada
+   * yoziladi — yarim-yozilgan qaytarish qolmaydi.
+   */
+  async createFromSale(dto: ReturnFromSaleDto) {
+
+    const result = await this.returnRepository.manager.transaction(async manager => {
+
+      const sale = await manager.findOne(Sale, {
+        where: { id: dto.sale_id },
+        relations: ['items', 'items.product', 'items.warehouse', 'items.returnItems', 'payments', 'customer', 'returns'],
+      });
+      if (!sale) throw new NotFoundException('Продажа не найдена');
+
+      const requested = new Map<number, number>();
+      for (const item of dto.items) {
+        requested.set(item.sale_item_id, (requested.get(item.sale_item_id) ?? 0) + item.quantity);
+      }
+
+      const lines: { saleItem: SaleItem, quantity: number }[] = [];
+      for (const [saleItemId, quantity] of requested) {
+        const saleItem = sale.items.find(item => item.id === saleItemId);
+        if (!saleItem) throw new BadRequestException('Товар не найден в этой продаже');
+        if (!saleItem.product || !saleItem.warehouse) {
+          throw new BadRequestException('Товар или склад удалён — вернуть нельзя');
+        }
+
+        const available = saleItem.quantity - saleItem.returnItems.reduce((sum, r) => sum + r.quantity, 0);
+        if (quantity > available) {
+          throw new BadRequestException(`«${saleItem.product.name}»: можно вернуть не больше ${available} шт.`);
+        }
+        lines.push({ saleItem, quantity });
+      }
+
+      const gross = lines.reduce((sum, line) => sum + line.quantity * line.saleItem.price, 0);
+      const saleNet = sale.total - sale.discount;
+      const returnedBefore = sale.returns.reduce((sum, r) => sum + r.total - r.discount, 0);
+
+      // Yaxlitlash tufayli bir necha qismli qaytarish jami savdo summasidan oshib ketmasin.
+      const proportional = sale.total > 0 ? Math.round(gross * saleNet / sale.total) : 0;
+      const value = Math.max(0, Math.min(proportional, saleNet - returnedBefore));
+
+      const paid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+      const offset = Math.min(value, Math.max(0, saleNet - paid));
+      const refund = value - offset;
+
+      const method = dto.method?.trim();
+      if (refund > 0 && !method) throw new BadRequestException('Выберите способ возврата денег');
+
+      const returns = await manager.save(manager.create(Return, {
+        customer: sale.customer ? { id: sale.customer.id } : undefined,
+        user: dto.user_id ? { id: dto.user_id } : undefined,
+        sale: { id: sale.id },
+        total: gross,
+        discount: gross - value,
+      }));
+
+      for (const { saleItem, quantity } of lines) {
+        await manager.save(manager.create(ReturnItem, {
+          returns: { id: returns.id },
+          saleItem: { id: saleItem.id },
+          product: { id: saleItem.product.id },
+          warehouse: { id: saleItem.warehouse.id },
+          quantity,
+          price: saleItem.price,
+          checkPrice: saleItem.checkPrice,
+        }));
+
+        const stock = await manager.findOne(Stock, {
+          where: { product: { id: saleItem.product.id }, warehouse: { id: saleItem.warehouse.id } },
+        });
+        if (stock) {
+          stock.quantity += quantity;
+          await manager.save(stock);
+        } else {
+          await manager.save(manager.create(Stock, {
+            quantity,
+            product: { id: saleItem.product.id },
+            warehouse: { id: saleItem.warehouse.id },
+          }));
+        }
+      }
+
+      if (refund > 0) {
+        await manager.save(manager.create(Payment, { returns: { id: returns.id }, amount: refund, method }));
+      }
+      if (offset > 0) {
+        await manager.save(manager.create(Payment, { returns: { id: returns.id }, amount: offset, method: OFFSET_METHOD }));
+        await manager.save(manager.create(Payment, { sale: { id: sale.id }, amount: offset, method: OFFSET_METHOD }));
+      }
+
+      return { id: returns.id, total: gross, value, offset, refund };
+    });
+
+    // Tranzaksiya yakunlangach — Telegram ga (javobni kutmasdan).
+    this.telegramBot.notifyReturn(result.id);
+
+    return result;
+  }
 
 
   async createFullReturns(createReturnsDto: CreateReturnDto) {
@@ -59,6 +176,7 @@ export class ReturnService {
       await this.stockService.updateFilterAdd(item)
     }
 
+    this.telegramBot.notifyReturn(returns.id);
 
     return this.returnRepository.findOne({
       where: { id: returns.id },
@@ -118,7 +236,8 @@ export class ReturnService {
         .leftJoinAndSelect('return.user', 'user')
         .leftJoinAndSelect('items.warehouse', 'warehouse')
         .leftJoinAndSelect('items.product', 'product')
-        .leftJoinAndSelect('return.customer', 'customer');
+        .leftJoinAndSelect('return.customer', 'customer')
+        .leftJoinAndSelect('return.sale', 'sale');
 
         // 🔍 Search qo‘shish new added
         if (search) {

@@ -42,9 +42,10 @@ export class ProductController {
     @Query("page") page:string,
     @Query("limit") limit:string,
     @Query("search") search:string,
-    @Query("categoryId") categoryId?:string
+    @Query("categoryId") categoryId?:string,
+    @Query("stocked") stocked?:string
   ) {
-    return this.productService.findAllPagSearch(+page,+limit,search,+(categoryId ?? 0) || undefined);
+    return this.productService.findAllPagSearch(+page,+limit,search,+(categoryId ?? 0) || undefined,stocked === 'true');
   }
 
   @Get('getby/:id')

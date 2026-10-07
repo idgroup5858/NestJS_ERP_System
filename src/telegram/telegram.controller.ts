@@ -17,6 +17,26 @@ export class TelegramController {
     return this.telegramService.findAll();
   }
 
+  @Get("bots")
+  findAllBots() {
+    return this.telegramService.findAllBots();
+  }
+
+  @Post("relink/:id")
+  regenerateLink(@Param('id') id: string) {
+    return this.telegramService.regenerateLink(+id);
+  }
+
+  @Post("test/:id")
+  sendTest(@Param('id') id: string) {
+    return this.telegramService.sendTest(+id);
+  }
+
+  @Delete("chat/:id")
+  removeChat(@Param('id') id: string) {
+    return this.telegramService.removeChat(+id);
+  }
+
   @Get('getby/:id')
   findOne(@Param('id') id: string) {
     return this.telegramService.findOne(+id);

@@ -1,7 +1,8 @@
 import { Product } from "src/product/entities/product.entity";
+import { ReturnItem } from "src/return_items/entities/return_item.entity";
 import { Sale } from "src/sale/entities/sale.entity";
 import { Warehouse } from "src/warehouse/entities/warehouse.entity";
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
 
@@ -29,6 +30,10 @@ export class SaleItem {
 
         @Column({ default: false })
         checkPrice: boolean;
+
+        // Shu qatordan qaytarilganlar — qayta qaytarishda qolgan miqdorni hisoblash uchun.
+        @OneToMany(() => ReturnItem, returnItem => returnItem.saleItem)
+        returnItems: ReturnItem[];
 
         @CreateDateColumn()
         date: Date;

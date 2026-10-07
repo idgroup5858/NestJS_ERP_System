@@ -243,7 +243,7 @@ export class ProductService {
     return this.productRepository.find({ relations: ['category', "stock", "stock.warehouse"] });
   }
 
-  async findAllPagSearch(page: number, limit: number, search?: string, categoryId?: number) {
+  async findAllPagSearch(page: number, limit: number, search?: string, categoryId?: number, stocked = false) {
   page = page > 0 ? page : 1;
   limit = limit > 0 ? limit : 10;
 
@@ -265,6 +265,13 @@ export class ProductService {
 
   if (categoryId) {
     query.andWhere('category.id = :categoryId', { categoryId });
+  }
+
+  // Faqat omborga biriktirilgan tovarlar (Приход/Возврат). Filtr sahifalashdan
+  // oldin bajarilishi shart: aks holda omborsiz yangi tovarlar birinchi
+  // sahifalarni egallab, omborlilarni keyingi sahifalarga surib yuboradi.
+  if (stocked) {
+    query.andWhere('EXISTS (SELECT 1 FROM stock s WHERE s."productId" = product.id)');
   }
 
   const [data, total] = await query

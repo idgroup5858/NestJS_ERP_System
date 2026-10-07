@@ -1,5 +1,6 @@
 import { Customer } from "src/customer/entities/customer.entity";
 import { Payment } from "src/payment/entities/payment.entity";
+import { Return } from "src/return/entities/return.entity";
 import { SaleItem } from "src/sale_items/entities/sale_item.entity";
 import { User } from "src/user/entities/user.entity";
 import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
@@ -18,6 +19,10 @@ export class Sale {
 
     @OneToMany(() => Payment, payment => payment.sale, { cascade: true,onDelete:"CASCADE" })
     payments: Payment[];
+
+    // Shu savdodan qilingan qaytarishlar (Список продаж ichidan).
+    @OneToMany(() => Return, returns => returns.sale)
+    returns: Return[];
 
 
     @ManyToOne(() => Customer, customer => customer.sale)
