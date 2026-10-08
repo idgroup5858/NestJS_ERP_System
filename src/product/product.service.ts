@@ -10,6 +10,7 @@ import { In, Repository } from 'typeorm';
 import { CategoryService } from 'src/category/category.service';
 import path from 'path';
 import * as fs from 'fs';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ProductService {
@@ -18,7 +19,8 @@ export class ProductService {
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
-    private readonly categoryService: CategoryService
+    private readonly categoryService: CategoryService,
+    private readonly configService: ConfigService
   ) { }
 
 
@@ -365,7 +367,7 @@ export class ProductService {
         // 1. eski rasmni saqlab qolamiz
         const oldImageUrl = checkProduct.imgUrl;
 
-        const baseUrl = `http://localhost:3000`;
+        const baseUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
 
         const product = await this.productRepository.preload({
           id,
