@@ -22,6 +22,8 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { TelegramModule } from './telegram/telegram.module';
 import { MasterOrderModule } from './master_order/master_order.module';
+import { ExpenseModule } from './expense/expense.module';
+import { StatsModule } from './stats/stats.module';
 
 @Module({
   imports: [CustomerModule, UserModule, WarehouseModule, ProductModule, SaleModule, StockModule, PaymentModule, SaleItemsModule, DatabaseModule,
@@ -42,6 +44,8 @@ import { MasterOrderModule } from './master_order/master_order.module';
     TaskModule,
     TelegramModule,
     MasterOrderModule,
+    ExpenseModule,
+    StatsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
