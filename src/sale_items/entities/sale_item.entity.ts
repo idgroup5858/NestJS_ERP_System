@@ -1,3 +1,4 @@
+import { QUANTITY_COLUMN } from "src/common/quantity";
 import { Product } from "src/product/entities/product.entity";
 import { ReturnItem } from "src/return_items/entities/return_item.entity";
 import { Sale } from "src/sale/entities/sale.entity";
@@ -22,7 +23,7 @@ export class SaleItem {
         @ManyToOne(() => Warehouse)
         warehouse: Warehouse;
 
-        @Column()
+        @Column(QUANTITY_COLUMN)
         quantity: number;
 
         @Column()

@@ -6,6 +6,7 @@ import { Stock } from './entities/stock.entity';
 import { Repository } from 'typeorm';
 import { ProductService } from 'src/product/product.service';
 import { WarehouseService } from 'src/warehouse/warehouse.service';
+import { roundQuantity } from 'src/common/quantity';
 
 @Injectable()
 export class StockService {
@@ -26,9 +27,12 @@ export class StockService {
     const needed = new Map<string, number>();
     for (const item of items) {
       if (!item.warehouse_id) throw new BadRequestException('Товар не привязан к складу');
-      if (!(item.quantity > 0)) throw new BadRequestException('Неверное количество');
+      // Bazada miqdor 3 xonagacha saqlanadi: ortiq xona jimgina yaxlitlanib, ombor bilan farq qilmasin.
+      if (!(item.quantity > 0) || roundQuantity(item.quantity) !== item.quantity) {
+        throw new BadRequestException('Неверное количество');
+      }
       const key = `${item.product_id}:${item.warehouse_id}`;
-      needed.set(key, (needed.get(key) ?? 0) + item.quantity);
+      needed.set(key, roundQuantity((needed.get(key) ?? 0) + item.quantity));
     }
 
     for (const [key, quantity] of needed) {
@@ -173,7 +177,7 @@ export class StockService {
     });
     if (!checkStock) throw new NotFoundException('Не найден остаток');
 
-    checkStock.quantity -= createStockDto.quantity;
+    checkStock.quantity = roundQuantity(checkStock.quantity - createStockDto.quantity);
    
     await this.stocRepository.save(checkStock);
 
@@ -189,7 +193,7 @@ export class StockService {
     });
     if (!checkStock) throw new NotFoundException('Не найден остаток');
 
-    checkStock.quantity += createStockDto.quantity;
+    checkStock.quantity = roundQuantity(checkStock.quantity + createStockDto.quantity);
     
     await this.stocRepository.save(checkStock);
 

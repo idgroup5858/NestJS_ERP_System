@@ -8,6 +8,7 @@ import { SaleItemsService } from 'src/sale_items/sale_items.service';
 import { PaymentService } from 'src/payment/payment.service';
 import { StockService } from 'src/stock/stock.service';
 import { TelegramBotService } from 'src/telegram/telegram-bot.service';
+import { roundMoney, roundQuantity } from 'src/common/quantity';
 
 /** Savdoda chegirma umumiy summaning shu foizidan oshmasligi kerak. */
 const MAX_SALE_DISCOUNT_PERCENT = 20;
@@ -33,6 +34,7 @@ export class SaleService {
     for (const item of createSaleDto.items) {
       total += item.quantity * item.price;
     }
+    total = roundMoney(total);
 
     const discount = Math.round(Number(createSaleDto.discount) || 0);
     if (discount < 0 || discount > Math.floor(total * MAX_SALE_DISCOUNT_PERCENT / 100)) {
@@ -286,7 +288,7 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
       ...rest,
       items: items.map(({ returnItems, ...item }) => ({
         ...item,
-        returned: returnItems.reduce((sum, r) => sum + r.quantity, 0)
+        returned: roundQuantity(returnItems.reduce((sum, r) => sum + r.quantity, 0))
       })),
       returnedTotal: returns.reduce((sum, r) => sum + r.total - r.discount, 0)
     };

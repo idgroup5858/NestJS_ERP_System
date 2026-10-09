@@ -1,3 +1,4 @@
+import { QUANTITY_COLUMN } from "src/common/quantity";
 import { Product } from "src/product/entities/product.entity";
 import { User } from "src/user/entities/user.entity";
 import { Warehouse } from "src/warehouse/entities/warehouse.entity";
@@ -11,7 +12,7 @@ export class Stock {
     @PrimaryGeneratedColumn()
     id: number;
    
-    @Column()
+    @Column(QUANTITY_COLUMN)
     quantity: number;
     @CreateDateColumn()
     date: Date;

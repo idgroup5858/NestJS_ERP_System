@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { PaymentService } from 'src/payment/payment.service';
 import { StockService } from 'src/stock/stock.service';
 import { UpdateSaleDto } from 'src/sale/dto/update-sale.dto';
+import { roundMoney } from 'src/common/quantity';
 
 @Injectable()
 export class PurchaseService {
@@ -28,7 +29,8 @@ export class PurchaseService {
       for (const item of createPurchaseDto.items) {
         total += item.quantity * item.price;
       }
-  
+      total = roundMoney(total);
+
       await this.stockService.assertAvailable(createPurchaseDto.items, false);
 
       const purchase = this.purchaseRepository.create({

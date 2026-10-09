@@ -1,3 +1,4 @@
+import { QUANTITY_COLUMN } from "src/common/quantity";
 import { Product } from "src/product/entities/product.entity";
 import { Purchase } from "src/purchase/entities/purchase.entity";
 import { Return } from "src/return/entities/return.entity";
@@ -29,7 +30,7 @@ export class ReturnItem {
     @ManyToOne(() => SaleItem, saleItem => saleItem.returnItems, { nullable: true, onDelete: "SET NULL" })
     saleItem: SaleItem;
 
-    @Column()
+    @Column(QUANTITY_COLUMN)
     quantity: number;
 
     @Column()

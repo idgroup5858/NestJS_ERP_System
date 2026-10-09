@@ -16,6 +16,7 @@ import { PaymentService } from 'src/payment/payment.service';
 import { StockService } from 'src/stock/stock.service';
 import { TelegramBotService } from 'src/telegram/telegram-bot.service';
 import { Repository } from 'typeorm';
+import { roundMoney, roundQuantity } from 'src/common/quantity';
 
 @Injectable()
 export class ReturnService {
@@ -53,7 +54,8 @@ export class ReturnService {
 
       const requested = new Map<number, number>();
       for (const item of dto.items) {
-        requested.set(item.sale_item_id, (requested.get(item.sale_item_id) ?? 0) + item.quantity);
+        if (roundQuantity(item.quantity) !== item.quantity) throw new BadRequestException('Неверное количество');
+        requested.set(item.sale_item_id, roundQuantity((requested.get(item.sale_item_id) ?? 0) + item.quantity));
       }
 
       const lines: { saleItem: SaleItem, quantity: number }[] = [];
@@ -64,14 +66,14 @@ export class ReturnService {
           throw new BadRequestException('Товар или склад удалён — вернуть нельзя');
         }
 
-        const available = saleItem.quantity - saleItem.returnItems.reduce((sum, r) => sum + r.quantity, 0);
+        const available = roundQuantity(saleItem.quantity - saleItem.returnItems.reduce((sum, r) => sum + r.quantity, 0));
         if (quantity > available) {
           throw new BadRequestException(`«${saleItem.product.name}»: можно вернуть не больше ${available} шт.`);
         }
         lines.push({ saleItem, quantity });
       }
 
-      const gross = lines.reduce((sum, line) => sum + line.quantity * line.saleItem.price, 0);
+      const gross = roundMoney(lines.reduce((sum, line) => sum + line.quantity * line.saleItem.price, 0));
       const saleNet = sale.total - sale.discount;
       const returnedBefore = sale.returns.reduce((sum, r) => sum + r.total - r.discount, 0);
 
@@ -109,7 +111,7 @@ export class ReturnService {
           where: { product: { id: saleItem.product.id }, warehouse: { id: saleItem.warehouse.id } },
         });
         if (stock) {
-          stock.quantity += quantity;
+          stock.quantity = roundQuantity(stock.quantity + quantity);
           await manager.save(stock);
         } else {
           await manager.save(manager.create(Stock, {
@@ -145,6 +147,7 @@ export class ReturnService {
     for (const item of createReturnsDto.items) {
       total += item.quantity * item.price;
     }
+    total = roundMoney(total);
 
     await this.stockService.assertAvailable(createReturnsDto.items, false);
 

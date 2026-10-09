@@ -1,13 +1,13 @@
 import { Type } from "class-transformer";
-import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Min, ValidateNested } from "class-validator";
+import { ArrayMinSize, IsArray, IsInt, IsNumber, IsOptional, IsString, Min, ValidateNested } from "class-validator";
 
 export class ReturnFromSaleItemDto {
 
     @IsInt()
     sale_item_id: number;
 
-    @IsInt()
-    @Min(1)
+    @IsNumber({ maxDecimalPlaces: 3 })
+    @Min(0.001)
     quantity: number;
 }
 

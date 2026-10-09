@@ -21,6 +21,7 @@ import { TaskModule } from './task/task.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { TelegramModule } from './telegram/telegram.module';
+import { MasterOrderModule } from './master_order/master_order.module';
 
 @Module({
   imports: [CustomerModule, UserModule, WarehouseModule, ProductModule, SaleModule, StockModule, PaymentModule, SaleItemsModule, DatabaseModule,
@@ -40,6 +41,7 @@ import { TelegramModule } from './telegram/telegram.module';
     TaskPipelineModule,
     TaskModule,
     TelegramModule,
+    MasterOrderModule,
   ],
   controllers: [AppController],
   providers: [AppService],

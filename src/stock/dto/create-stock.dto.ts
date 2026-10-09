@@ -10,6 +10,6 @@ export class CreateStockDto {
         warehouse_id: number;
         
         user_id:number;
-        @IsNumber()
+        @IsNumber({ maxDecimalPlaces: 3 })
         quantity: number;
 }
