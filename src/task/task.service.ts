@@ -410,6 +410,38 @@ export class TaskService {
     };
   }
 
+  /**
+   * Har bir voronka (tab) bo'yicha foydalanuvchiga ko'rinadigan vazifalar soni: faol (yopilmagan),
+   * muddati o'tgan va jami. Qolgan filtrlar (qidiruv, javobgar, "только просроченные") hisobga olinadi,
+   * voronka/etap/holat filtrlari esa yo'q — tablardagi sonlar shu uchun.
+   */
+  async pipelineCounts(requested: TaskListQueryDto) {
+    const filter = await this.scoped(requested);
+    const rows = await this.applyFilter(this.lightQuery(), {
+      ...filter,
+      pipeline_id: undefined,
+      stage_id: undefined,
+      state: undefined,
+    })
+      .select('pl.id', 'pipelineId')
+      .addSelect(`COUNT(*) FILTER (WHERE st.type <> 'done')`, 'active')
+      .addSelect(`COUNT(*) FILTER (WHERE ${OVERDUE_SQL})`, 'overdue')
+      .addSelect('COUNT(*)', 'total')
+      .groupBy('pl.id')
+      .getRawMany<{ pipelineId: number | null; active: string; overdue: string; total: string }>();
+
+    const pipelines: Record<number, { active: number; overdue: number; total: number }> = {};
+    for (const row of rows) {
+      if (row.pipelineId === null) continue;
+      pipelines[Number(row.pipelineId)] = {
+        active: Number(row.active),
+        overdue: Number(row.overdue),
+        total: Number(row.total),
+      };
+    }
+    return { pipelines };
+  }
+
   /** Doska: jarayon etaplari va ularning vazifalari (yopilganlardan faqat oxirgilari). */
   async board(requested: TaskListQueryDto) {
     const query = await this.scoped(requested);

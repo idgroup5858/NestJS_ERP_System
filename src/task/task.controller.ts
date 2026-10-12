@@ -32,6 +32,12 @@ export class TaskController {
     return this.taskService.findAllPagSearch(query.page ?? 1, query.limit ?? 10, query);
   }
 
+  /** Voronkalar (tablar) bo'yicha vazifalar soni: `{ pipelines: { "<id>": { active, overdue, total } } }`. */
+  @Get('pipeline-counts')
+  pipelineCounts(@Query() query: TaskListQueryDto) {
+    return this.taskService.pipelineCounts(query);
+  }
+
   /** Doska: jarayon etaplari va ulardagi vazifalar. */
   @Get('board')
   board(@Query() query: TaskListQueryDto) {
