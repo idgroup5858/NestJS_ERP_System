@@ -4102,7 +4102,7 @@
     },
     {
       "name": "19 - App settings",
-      "description": "Umumiy sozlamalar. Hozircha: menyu bo'limlarini rollar bo'yicha ko'rsatish/yashirish (web \"Настройки\").",
+      "description": "Umumiy sozlamalar: menyu bo'limlarini rollar bo'yicha ko'rsatish/yashirish va tizimning asosiy rangi (web \"Настройки\" sahifasi, faqat admin).",
       "item": [
         {
           "name": "Menu access (get)",
@@ -4153,6 +4153,58 @@
               }
             },
             "description": "FAQAT ADMIN (user_id). overrides to'liq almashtiriladi; {} — hammasi standartga qaytadi. Kalitlar: first, dashboard, second, thrid, fourth, fifth, seventh, eighth, nineth, teenth, tasks, contracts, masters, elevn, twelw, expenses, integration."
+          },
+          "response": []
+        },
+        {
+          "name": "Appearance (get)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/app-setting/appearance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app-setting",
+                "appearance"
+              ]
+            },
+            "description": "Hamma o'qiydi (kirish sahifasida ham). { accent, updatedAt }. accent: indigo (standart), blue, cyan, teal, green, amber, orange, red, pink, violet. Tizim rangi hamma foydalanuvchida shu bo'yicha o'zgaradi."
+          },
+          "response": []
+        },
+        {
+          "name": "Appearance (set, admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/app-setting/appearance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app-setting",
+                "appearance"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 2,\n  \"accent\": \"green\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "FAQAT ADMIN (user_id). accent yuqoridagi 10 qiymatdan biri bo'lishi shart (aks holda 400). Admin bo'lmasa 403, user_id yo'q foydalanuvchi bo'lsa 404."
           },
           "response": []
         }

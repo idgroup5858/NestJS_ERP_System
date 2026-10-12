@@ -281,16 +281,15 @@ export class TaskService {
   // ------------------------------------------------------------------ yaratish va o'qish
   /**
    * Vazifa berish mumkin bo'lgan xodimlar (tanlagichlar uchun). Faqat id, ism va rol —
-   * parol xeshi chiqmaydi. Mobil ilovadagi ustalar (Master) vazifa olmaydi.
+   * parol xeshi chiqmaydi. Ustalar (Master) ham ro'yxatda: ularga ham vazifa biriktiriladi
+   * (veb'da ularga "Задачи" bo'limi ochiq).
    */
   async members() {
     const rows = await this.users.find({
       select: { id: true, username: true, surname: true, role: true },
       order: { username: 'ASC', id: 'ASC' },
     });
-    return rows
-      .filter((user) => user.role?.trim().toLowerCase() !== 'master')
-      .map((user) => ({ id: user.id, username: user.username, surname: user.surname, role: user.role }));
+    return rows.map((user) => ({ id: user.id, username: user.username, surname: user.surname, role: user.role }));
   }
 
 

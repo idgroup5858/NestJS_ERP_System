@@ -3,9 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { UpdateMenuAccessDto } from './dto/menu-access.dto';
+import { UpdateAppearanceDto } from './dto/appearance.dto';
+import { DEFAULT_ACCENT } from './appearance';
 import { AppSetting } from './entities/app_setting.entity';
 
 export const MENU_ACCESS_KEY = 'menu_access';
+export const APPEARANCE_KEY = 'appearance';
 
 /** Sozlanadigan rollar. Admin doim hamma bo'limni ko'radi, shuning uchun bu yerda yo'q. */
 export const MENU_ROLES = ['user', 'accountant', 'master'] as const;
@@ -35,12 +38,33 @@ export class AppSettingService {
     };
   }
 
+  /** Sozlamalarni faqat administrator o'zgartiradi. */
+  private async requireAdmin(userId: number, message: string) {
+    const actor = await this.users.findOneBy({ id: userId });
+    if (!actor) throw new NotFoundException(`Пользователь #${userId} не найден`);
+    if (actor.role?.trim().toLowerCase() !== 'admin') throw new ForbiddenException(message);
+    return actor;
+  }
+
+  /** Tizim rangi: hamma o'qiydi (kirish sahifasida ham ishlatiladi); ichida maxfiy narsa yo'q. */
+  async getAppearance() {
+    const row = await this.settings.findOne({ where: { key: APPEARANCE_KEY } });
+    const accent = (row?.value as { accent?: string } | undefined)?.accent;
+    return { accent: accent ?? DEFAULT_ACCENT, updatedAt: row?.updatedAt ?? null };
+  }
+
+  async setAppearance(dto: UpdateAppearanceDto) {
+    const actor = await this.requireAdmin(dto.user_id, 'Менять оформление может только администратор');
+    await this.settings.save(this.settings.create({
+      key: APPEARANCE_KEY,
+      value: { accent: dto.accent },
+      updatedBy: actor,
+    }));
+    return this.getAppearance();
+  }
+
   async setMenuAccess(dto: UpdateMenuAccessDto) {
-    const actor = await this.users.findOneBy({ id: dto.user_id });
-    if (!actor) throw new NotFoundException(`Пользователь #${dto.user_id} не найден`);
-    if (actor.role?.trim().toLowerCase() !== 'admin') {
-      throw new ForbiddenException('Настройки меню может менять только администратор');
-    }
+    const actor = await this.requireAdmin(dto.user_id, 'Настройки меню может менять только администратор');
 
     await this.settings.save(this.settings.create({
       key: MENU_ACCESS_KEY,
