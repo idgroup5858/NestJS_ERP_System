@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Headers, Search } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, ParseIntPipe, Delete, Query, UseGuards, Headers, Search } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { LoginDto } from './dto/login-user.dto';
 import { AuthGuard } from '@nestjs/passport'; 
 import { TgUpdateDto } from './dto/TgUpdateDto';
@@ -53,6 +54,18 @@ export class UserController {
   @Patch('update/:id')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.userService.update(+id, updateUserDto);
+  }
+
+  /** O'z profili: parol xeshisiz ko'rinish. */
+  @Get('profile/:id')
+  getProfile(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.getProfile(id);
+  }
+
+  /** O'z profilini tahrirlash (rolsiz); parolni almashtirish uchun joriy parol kerak. */
+  @Patch('profile/:id')
+  updateProfile(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateProfileDto) {
+    return this.userService.updateProfile(id, dto);
   }
 
 

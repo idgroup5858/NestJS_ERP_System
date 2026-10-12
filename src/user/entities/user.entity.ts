@@ -47,12 +47,14 @@ export class User {
     @OneToMany(() => Return, returns => returns.user)
     returns:Return[]
 
-    @OneToMany(() => Task, ownedTasks => ownedTasks.owner)
-    ownedTasks:Task[]
+    /** Ochgan vazifalari. */
+    @OneToMany(() => Task, task => task.creator)
+    createdTasks:Task[]
 
 
-    @OneToMany(() => Task, assignedTasks => assignedTasks.assigned)
-    assignedTasks:Task[]
+    /** Asosiy javobgar bo'lgan vazifalari. */
+    @OneToMany(() => Task, task => task.responsible)
+    responsibleTasks:Task[]
 
 
     @ManyToOne(() => Telegram , telegam => telegam.user)

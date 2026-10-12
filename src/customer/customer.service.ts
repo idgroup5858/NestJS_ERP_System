@@ -118,13 +118,15 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
 
   const query = this.customerRepository.createQueryBuilder('customer');
 
-  // 🔍 Search qo‘shish
-  if (search) {
-    query.where(
-      'customer.username ILIKE :search OR customer.surname ILIKE :search OR customer.phone ILIKE :search',
-      { search: `%${search}%` }
+  // 🔍 Qidiruv so'zma-so'z: "Alisher Karimov" yoki "Karimov Alis" ham topiladi — har bir so'z
+  // ism, familiya yoki telefondan birida bo'lishi kerak. Bitta so'z uchun xatti-harakat eskisidek.
+  const words = (search ?? '').trim().split(/\s+/).filter(Boolean);
+  words.forEach((word, index) => {
+    query.andWhere(
+      `(customer.username ILIKE :w${index} OR customer.surname ILIKE :w${index} OR customer.phone ILIKE :w${index})`,
+      { [`w${index}`]: `%${word}%` }
     );
-  }
+  });
 
   const [data, total] = await query
     .orderBy('customer.id', 'DESC')

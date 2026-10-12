@@ -29,6 +29,31 @@ export class Customer {
         @Column({default:null})
         owner: string;
 
+        // Bank rekvizitlari: shartnoma bo'yicha savdoda buxgalter to'ldiradi, keyingi shartnomalarda qayta kiritilmaydi.
+        @Column({ type: 'varchar', length: 200, nullable: true })
+        orgName: string | null;
+
+        /** STIR (INN). */
+        @Column({ type: 'varchar', length: 20, nullable: true })
+        inn: string | null;
+
+        @Column({ type: 'varchar', length: 200, nullable: true })
+        bankName: string | null;
+
+        @Column({ type: 'varchar', length: 12, nullable: true })
+        mfo: string | null;
+
+        /** Hisob raqami (р/с). */
+        @Column({ type: 'varchar', length: 34, nullable: true })
+        account: string | null;
+
+        @Column({ type: 'varchar', length: 300, nullable: true })
+        address: string | null;
+
+        /** Rahbar (direktor). */
+        @Column({ type: 'varchar', length: 150, nullable: true })
+        director: string | null;
+
 
         @OneToMany(() => Sale, sale => sale.customer)
         sale:Sale[]

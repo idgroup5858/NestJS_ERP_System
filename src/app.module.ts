@@ -24,6 +24,9 @@ import { TelegramModule } from './telegram/telegram.module';
 import { MasterOrderModule } from './master_order/master_order.module';
 import { ExpenseModule } from './expense/expense.module';
 import { StatsModule } from './stats/stats.module';
+import { ContractModule } from './contract/contract.module';
+import { AttachmentModule } from './attachment/attachment.module';
+import { AppSettingModule } from './app_setting/app_setting.module';
 
 @Module({
   imports: [CustomerModule, UserModule, WarehouseModule, ProductModule, SaleModule, StockModule, PaymentModule, SaleItemsModule, DatabaseModule,
@@ -46,6 +49,9 @@ import { StatsModule } from './stats/stats.module';
     MasterOrderModule,
     ExpenseModule,
     StatsModule,
+    AttachmentModule,
+    ContractModule,
+    AppSettingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

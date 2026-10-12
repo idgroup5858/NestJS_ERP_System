@@ -370,6 +370,60 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Profile (get)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/user/profile/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "profile",
+                "1"
+              ]
+            },
+            "description": "Xodimning o'z ma'lumoti: id, username, surname, phone, email, role, createdAt (parol xeshisiz)."
+          },
+          "response": []
+        },
+        {
+          "name": "Profile (update)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/profile/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "profile",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"Ali\",\n  \"surname\": \"Valiyev\",\n  \"phone\": \"+998901234567\",\n  \"email\": \"ali@example.com\",\n  \"currentPassword\": \"eski-parol\",\n  \"newPassword\": \"yangi-parol-123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Hamma maydon ixtiyoriy. Rol bu yerda o'zgarmaydi. Parolni almashtirish uchun currentPassword majburiy (yangi parol kamida 8 belgi). Email band bo'lsa 409."
+          },
+          "response": []
         }
       ]
     },
@@ -514,7 +568,8 @@
                   "value": "Vali"
                 }
               ]
-            }
+            },
+            "description": "search so'zma-so'z: har bir so'z ism, familiya yoki telefondan birida bo'lishi kerak (\"Alisher Karimov\", \"Karimov Alis\", \"90 123\"). Vazifa/shartnoma kontragent tanlagichi shuni ishlatadi."
           },
           "response": []
         },
@@ -1424,7 +1479,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": " payments[].method = \"По договору\" (amount 0) bo'lsa: kontragent (customer_id) majburiy; savdo qarz sifatida yoziladi va shartnoma + kuzatuv vazifasi avtomatik ochiladi. Javobda contract {id, number} va contractError."
           },
           "response": []
         },
@@ -2522,6 +2578,7 @@
     },
     {
       "name": "14 - Task",
+      "description": "Vazifalar (CRM uslubida). Jarayon (voronka) -> etap -> vazifa. Vazifani faqat Admin ochadi; Admin hamma vazifani ko'radi, qolganlar (User, Accountant) faqat o'ziga tegishlisini (javobgar, ishtirokchi yoki ochgan). \"На проверке\" etapiga ijrochi o'tkazadi (= yopish), \"Закрыта\" ga faqat Admin (tasdiqlash). user_id — harakatni bajarayotgan foydalanuvchi (autentifikatsiya qo'shilguncha body/query orqali; ro'yxat, doska va kartochka uchun majburiy).",
       "item": [
         {
           "name": "Create",
@@ -2534,58 +2591,180 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/task",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "task"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Omborni tekshirish\",\n  \"description\": \"Haftalik inventarizatsiya\",\n  \"priority\": \"high\",\n  \"pipeline\": {\n    \"id\": 1\n  },\n  \"owner\": {\n    \"id\": 1\n  },\n  \"assigned\": {\n    \"id\": 2\n  },\n  \"dueDate\": \"2026-10-15T10:00:00.000Z\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get all",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/task",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "task"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get one",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/task/1",
+              "raw": "{{baseUrl}}/task/add",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "task",
-                "1"
+                "add"
               ]
-            }
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Mijoz bilan shartnoma imzolash\",\n  \"description\": \"Barcha hujjatlarni tayyorlash va imzolash\",\n  \"priority\": \"high\",\n  \"pipeline_id\": 1,\n  \"dueDate\": \"2026-10-20T18:00:00.000Z\",\n  \"responsible_id\": 2,\n  \"participant_ids\": [\n    3\n  ],\n  \"user_id\": 1,\n  \"contract_id\": 1,\n  \"customer_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "FAQAT ADMIN: user_id admin bo'lmasa 403. stage_id berilmasa — jarayonning birinchi oddiy etapi. responsible_id — asosiy javobgar, participant_ids — qo'shimcha ijrochilar. contract_id — vazifa shartnoma ustida bajariladi (ixtiyoriy). customer_id — kontragent (mijoz, \"customer\" jadvalidan), ixtiyoriy."
+          },
+          "response": []
+        },
+        {
+          "name": "Members (assignees)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/task/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "members"
+              ]
+            },
+            "description": "Vazifa berish mumkin bo'lgan xodimlar (parolsiz; Master roli chiqmaydi)."
+          },
+          "response": []
+        },
+        {
+          "name": "List (paginated + filters)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/task/allpagsearch?page=1&limit=10&search=&pipeline_id=1&state=open&member_id=2&overdue=false&contract_id=&with_contract=false&stage_id=&user_id=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "allpagsearch"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "pipeline_id",
+                  "value": "1"
+                },
+                {
+                  "key": "state",
+                  "value": "open"
+                },
+                {
+                  "key": "member_id",
+                  "value": "2"
+                },
+                {
+                  "key": "overdue",
+                  "value": "false"
+                },
+                {
+                  "key": "contract_id",
+                  "value": ""
+                },
+                {
+                  "key": "with_contract",
+                  "value": "false"
+                },
+                {
+                  "key": "stage_id",
+                  "value": ""
+                },
+                {
+                  "key": "user_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "user_id majburiy: admin bo'lmasa server member_id ni shu foydalanuvchiga majburlaydi (faqat o'z vazifalari). state: open | review | done. stage_id — bitta etap bo'yicha filtr. member_id — javobgar, ishtirokchi yoki ochgan (admin uchun \"mening vazifalarim\"). overdue=true — muddati o'tganlar. Javobda: meta (sahifalash), summary {open, review, done, overdue}, stageCounts {\"<etap id>\": son} — etap tugmalaridagi sonlar (stage_id/state filtrisiz) va data."
+          },
+          "response": []
+        },
+        {
+          "name": "Board (kanban)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/task/board?pipeline_id=1&member_id=&responsible_id=&search=&contract_id=&user_id=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "board"
+              ],
+              "query": [
+                {
+                  "key": "pipeline_id",
+                  "value": "1"
+                },
+                {
+                  "key": "member_id",
+                  "value": ""
+                },
+                {
+                  "key": "responsible_id",
+                  "value": ""
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "contract_id",
+                  "value": ""
+                },
+                {
+                  "key": "user_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "user_id majburiy: admin bo'lmasa faqat o'z vazifalari. Jarayon etaplari va ularning vazifalari. pipeline_id berilmasa — birinchi jarayon. Yopilganlardan faqat oxirgi 30 tasi (total — hammasi)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get one (+ history)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/task/getby/1?user_id=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "getby",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "user_id majburiy: admin bo'lmagan foydalanuvchi o'ziga tegishli bo'lmagan vazifani ochsa — 403."
           },
           "response": []
         },
@@ -2600,18 +2779,223 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/task/1",
+              "raw": "{{baseUrl}}/task/update/1",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "task",
+                "update",
                 "1"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"priority\": \"medium\",\n  \"assigned\": {\n    \"id\": 3\n  }\n}",
+              "raw": "{\n  \"title\": \"Yangi nom\",\n  \"priority\": \"normal\",\n  \"dueDate\": null,\n  \"responsible_id\": 3,\n  \"participant_ids\": [\n    2\n  ],\n  \"user_id\": 1,\n  \"contract_id\": 1,\n  \"customer_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "FAQAT ADMIN: user_id admin bo'lmasa 403 (javobgar va ishtirokchi ham tahrirlay olmaydi). dueDate yoki responsible_id ga null yuborilsa — tozalanadi; yuborilmasa — o'zgarmaydi. contract_id=null — shartnomadan ajratadi. customer_id=null — kontragentni olib tashlaydi."
+          },
+          "response": []
+        },
+        {
+          "name": "Set customer (accountant / admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task/customer/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "customer",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 2,\n  \"customer_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Vazifaga kontragent (mijoz) biriktirish: faqat Accountant va Admin (boshqa rolga 403). Buxgalter faqat o'ziga tegishli vazifada. customer_id=null — olib tashlaydi. Yopilgan vazifada 400. Tarixga \"контрагент: A → B\" yoziladi. Yangi kontragent POST /customer/add orqali ochiladi (Клиенты jadvaliga)."
+          },
+          "response": []
+        },
+        {
+          "name": "Move to stage (drag & drop)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task/move/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "move",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stage_id\": 2,\n  \"user_id\": 2,\n  \"note\": \"Boshladim\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Closed (done) etapga faqat Admin. Yopilgan vazifani faqat Admin qayta ochadi."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit (close for review)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task/submit/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "submit",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ijrochi \"yopadi\": vazifa \"На проверке\" etapiga tushadi."
+          },
+          "response": []
+        },
+        {
+          "name": "Approve (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task/approve/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "approve",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Faqat Admin. Vazifa yopiladi va statistikada javobgarga yoziladi."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task/reject/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "reject",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 1,\n  \"note\": \"Hujjatlar to'liq emas\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Faqat Admin; izoh majburiy. Vazifa yuborilgan etapiga qaytadi."
+          },
+          "response": []
+        },
+        {
+          "name": "Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task/comment/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task",
+                "comment",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 2,\n  \"note\": \"Hujjatlar yig'ildi\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2622,20 +3006,28 @@
           "response": []
         },
         {
-          "name": "Delete",
+          "name": "Delete (admin)",
           "request": {
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/task/1",
+              "raw": "{{baseUrl}}/task/delete/1?user_id=1",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "task",
+                "delete",
                 "1"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "1"
+                }
               ]
-            }
+            },
+            "description": "Faqat Admin."
           },
           "response": []
         }
@@ -2643,6 +3035,7 @@
     },
     {
       "name": "15 - Task Pipeline",
+      "description": "Jarayonlar (voronkalar). Yangi jarayon 4 ta standart etap bilan yaratiladi: Новая, В работе, На проверке, Закрыта. Birinchi ishga tushishda \"Обычная задача\" va \"По договору\" avtomatik yaratiladi.",
       "item": [
         {
           "name": "Create",
@@ -2655,17 +3048,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/task-pipeline",
+              "raw": "{{baseUrl}}/task-pipeline/add",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "task-pipeline"
+                "task-pipeline",
+                "add"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Bajarilmoqda\",\n  \"order_id\": 1\n}",
+              "raw": "{\n  \"name\": \"Hujjat aylanishi\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2676,19 +3070,21 @@
           "response": []
         },
         {
-          "name": "Get all",
+          "name": "Get all (with stages)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/task-pipeline",
+              "raw": "{{baseUrl}}/task-pipeline/getall",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "task-pipeline"
+                "task-pipeline",
+                "getall"
               ]
-            }
+            },
+            "description": "Har bir jarayon etaplari tartibda va tasksCount bilan."
           },
           "response": []
         },
@@ -2698,12 +3094,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/task-pipeline/1",
+              "raw": "{{baseUrl}}/task-pipeline/getby/1",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "task-pipeline",
+                "getby",
                 "1"
               ]
             }
@@ -2721,18 +3118,19 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/task-pipeline/1",
+              "raw": "{{baseUrl}}/task-pipeline/update/1",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "task-pipeline",
+                "update",
                 "1"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Yangi nom\",\n  \"order_id\": 2\n}",
+              "raw": "{\n  \"name\": \"Yangi nom\",\n  \"order_id\": 3\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2748,15 +3146,141 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/task-pipeline/1",
+              "raw": "{{baseUrl}}/task-pipeline/delete/1",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "task-pipeline",
+                "delete",
                 "1"
               ]
+            },
+            "description": "Vazifalari bor jarayonni o'chirib bo'lmaydi (409)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "15b - Task Stage",
+      "description": "Jarayon etaplari (doskadagi ustunlar). Faqat oddiy etap qo'shiladi; \"На проверке\" va \"Закрыта\" har jarayonda bittadan, o'chirilmaydi va doim oxirida turadi. color: neutral | info | primary | success | warning | danger.",
+      "item": [
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task-stage/add",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task-stage",
+                "add"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pipeline_id\": 1,\n  \"name\": \"Mijoz tekshiruvi\",\n  \"color\": \"info\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
+          },
+          "response": []
+        },
+        {
+          "name": "Update",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task-stage/update/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task-stage",
+                "update",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Yangi nom\",\n  \"color\": \"primary\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reorder",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task-stage/reorder",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task-stage",
+                "reorder"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pipeline_id\": 1,\n  \"ids\": [\n    2,\n    1\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "ids — jarayondagi BARCHA oddiy etaplar yangi tartibda."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/task-stage/delete/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "task-stage",
+                "delete",
+                "1"
+              ]
+            },
+            "description": "Vazifasi bor etapni o'chirib bo'lmaydi (409); jarayonda kamida bitta oddiy etap qoladi."
           },
           "response": []
         }
@@ -2958,6 +3482,677 @@
                 "1"
               ]
             }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "17 - Contract",
+      "description": "Shartnomalar. Holatlar: draft -> signed -> active (qo'lda), review (buxgalter \"yopdi\"), closed (admin tasdiqladi), cancelled. closedBy — yopilganda javobgar buxgalter. user_id — harakatni bajarayotgan foydalanuvchi.",
+      "item": [
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/add",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "add"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"number\": \"2026/17\",\n  \"subject\": \"Uskunalar yetkazib berish\",\n  \"customer_id\": 1,\n  \"amount\": 48500000,\n  \"currency\": \"UZS\",\n  \"contractDate\": \"2026-10-01\",\n  \"responsible_id\": 2,\n  \"status\": \"draft\",\n  \"user_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "number berilmasa avtomatik (D-0001). currency: UZS | USD. contractDate: YYYY-MM-DD. status: draft | signed | active."
+          },
+          "response": []
+        },
+        {
+          "name": "List (paginated + filters)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contract/allpagsearch?page=1&limit=15&search=&status=&responsible_id=&closed_by_id=&customer_id=&closed_from=&closed_to=&user_id=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "allpagsearch"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "15"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "status",
+                  "value": ""
+                },
+                {
+                  "key": "responsible_id",
+                  "value": ""
+                },
+                {
+                  "key": "closed_by_id",
+                  "value": ""
+                },
+                {
+                  "key": "customer_id",
+                  "value": ""
+                },
+                {
+                  "key": "closed_from",
+                  "value": ""
+                },
+                {
+                  "key": "closed_to",
+                  "value": ""
+                },
+                {
+                  "key": "user_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "user_id majburiy: admin hamma shartnomani, qolganlar faqat o'ziga tegishlisini ko'radi (javobgar, ochgan yoki shartnomadagi vazifasi bor). closed_by_id — kim yopgan, closed_from/closed_to — yopilgan sana (YYYY-MM-DD), from/to — shartnoma sanasi. summary.byStatus — holat bo'yicha sonlar. unassigned=true — savdodan ochilgan va hali olinmagan (\"свободные\") shartnomalar; javobda summary.unassigned. Buxgalter hamma \"свободные\"larni ham ko'radi."
+          },
+          "response": []
+        },
+        {
+          "name": "Get one (files + tasks + history)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contract/getby/1?user_id=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "getby",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "user_id majburiy: o'ziga tegishli bo'lmagan shartnomani admin bo'lmagan foydalanuvchi ochsa — 403. "
+          },
+          "response": []
+        },
+        {
+          "name": "Update",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/update/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "update",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Yangi mavzu\",\n  \"amount\": 50000000,\n  \"customer_id\": null,\n  \"contractDate\": \"2026-10-05\",\n  \"user_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "user_id majburiy (admin bo'lmasa shartnoma o'ziga tegishli bo'lishi kerak, aks holda 403). customer_id, contractDate, responsible_id ga null — tozalaydi."
+          },
+          "response": []
+        },
+        {
+          "name": "Take (accountant)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/take/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "take",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Savdodan (\"По договору\") ochilgan, javobsiz shartnomani buxgalter oladi: birinchi olgan javobgar bo'ladi (boshqasiga 409). Bog'langan vazifa ham unga tayinlanadi. Faqat Accountant roli."
+          },
+          "response": []
+        },
+        {
+          "name": "Requisites (accountant / admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/requisites/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "requisites",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 3,\n  \"orgName\": \"OOO Namuna\",\n  \"inn\": \"123456789\",\n  \"bankName\": \"Ipoteka bank\",\n  \"mfo\": \"00873\",\n  \"account\": \"20208000100200300400\",\n  \"address\": \"Toshkent\",\n  \"director\": \"Aliyev A.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Kontragent kartasiga yoziladi (Customer): keyingi shartnomalarda qayta kiritilmaydi. Faqat javobgar buxgalter yoki admin. Bo'sh qator — maydonni tozalaydi; yuborilmasa — o'zgarmaydi. INN 9–14, MFO 3–9, hisob raqami 10–34 raqam."
+          },
+          "response": []
+        },
+        {
+          "name": "Payment — bank transfer (accountant / admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/payment/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "payment",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 3,\n  \"amount\": 5000000,\n  \"note\": \"п/п 125\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Bank o'tkazmasi kelganini kiritish: bog'langan savdoga \"Перечисление\" to'lovi qo'shiladi, qarz kamayadi. Qolgan qarzdan ko'p bo'lmaydi. Faqat javobgar buxgalter yoki admin."
+          },
+          "response": []
+        },
+        {
+          "name": "From sale (admin, retry)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/from-sale/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "from-sale",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Faqat admin: \"По договору\" savdosiga shartnoma (va vazifa) avtomatik ochilmay qolgan bo'lsa qayta urinish. Takror chaqirish xavfsiz — mavjud shartnomani qaytaradi."
+          },
+          "response": []
+        },
+        {
+          "name": "Set status (manual)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/status/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "status",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\",\n  \"user_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "draft | signed | active | cancelled. Yopilganni faqat admin qayta ochadi."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit (close for review)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/submit/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "submit",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/approve/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "approve",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Faqat Admin. Shartnoma yopiladi, closedBy = javobgar buxgalter."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/reject/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "reject",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 1,\n  \"note\": \"Hujjat yetishmaydi\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Faqat Admin; izoh majburiy. Tekshiruvga yuborilgan holatga qaytadi."
+          },
+          "response": []
+        },
+        {
+          "name": "Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/comment/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "comment",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 2,\n  \"note\": \"Imzoga yuborildi\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contract/delete/1?user_id=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "delete",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Faqat Admin. Fayllari ham o'chadi; vazifalar shartnomasiz qoladi."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "18 - Attachment",
+      "description": "Vazifa yoki shartnomaga biriktirilgan fayllar (rasm, PDF, Word/Excel, txt/csv, zip; 20 MB gacha). SVG/HTML/exe rad etiladi. Fayllar statik papkada emas — faqat shu API orqali beriladi.",
+      "item": [
+        {
+          "name": "Upload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/attachment/add",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attachment",
+                "add"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "user_id",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "contract_id",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "task_id",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "multipart/form-data. Aniq bittasi: task_id yoki contract_id."
+          },
+          "response": []
+        },
+        {
+          "name": "Open (inline: image / pdf)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/attachment/file/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attachment",
+                "file",
+                "1"
+              ]
+            },
+            "description": "Rasm va PDF brauzerda ochiladi (Content-Disposition: inline)."
+          },
+          "response": []
+        },
+        {
+          "name": "Download",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/attachment/file/1?download=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attachment",
+                "file",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "download",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Hammasi yuklab olinadi (attachment)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/attachment/delete/1?user_id=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attachment",
+                "delete",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Administrator yoki faylni yuklagan odam."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "19 - App settings",
+      "description": "Umumiy sozlamalar. Hozircha: menyu bo'limlarini rollar bo'yicha ko'rsatish/yashirish (web \"Настройки\").",
+      "item": [
+        {
+          "name": "Menu access (get)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/app-setting/menu-access",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app-setting",
+                "menu-access"
+              ]
+            },
+            "description": "Hamma o'qiydi. overrides: { <rol>: { <bo'lim kaliti>: true|false } } — faqat standartdan farqlari. Rollar: user, accountant, master (admin doim hammasini ko'radi)."
+          },
+          "response": []
+        },
+        {
+          "name": "Menu access (set, admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/app-setting/menu-access",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "app-setting",
+                "menu-access"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 2,\n  \"overrides\": {\n    \"user\": {\n      \"contracts\": true,\n      \"teenth\": false\n    },\n    \"accountant\": {\n      \"contracts\": true\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "FAQAT ADMIN (user_id). overrides to'liq almashtiriladi; {} — hammasi standartga qaytadi. Kalitlar: first, dashboard, second, thrid, fourth, fifth, seventh, eighth, nineth, teenth, tasks, contracts, masters, elevn, twelw, expenses, integration."
           },
           "response": []
         }

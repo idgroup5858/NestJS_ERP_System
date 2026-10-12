@@ -7,9 +7,10 @@ import { SaleItemsModule } from 'src/sale_items/sale_items.module';
 import { PaymentModule } from 'src/payment/payment.module';
 import { StockModule } from 'src/stock/stock.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
+import { ContractModule } from 'src/contract/contract.module';
 
 @Module({
-  imports:[SaleItemsModule,PaymentModule,StockModule,TelegramModule,TypeOrmModule.forFeature([Sale])],
+  imports:[SaleItemsModule,PaymentModule,StockModule,TelegramModule,ContractModule,TypeOrmModule.forFeature([Sale])],
   controllers: [SaleController],
   providers: [SaleService],
 })

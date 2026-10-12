@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { Sale } from './entities/sale.entity';
@@ -6,6 +6,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import { SaleItemsService } from 'src/sale_items/sale_items.service';
 import { PaymentService } from 'src/payment/payment.service';
+import { CONTRACT_METHOD } from 'src/payment/payment-methods';
+import { ContractService } from 'src/contract/contract.service';
 import { StockService } from 'src/stock/stock.service';
 import { TelegramBotService } from 'src/telegram/telegram-bot.service';
 import { roundMoney, roundQuantity } from 'src/common/quantity';
@@ -22,12 +24,19 @@ export class SaleService {
     private readonly saleItemsService: SaleItemsService,
     private readonly paymentService: PaymentService,
     private readonly stockService: StockService,
-    private readonly telegramBot: TelegramBotService
+    private readonly telegramBot: TelegramBotService,
+    private readonly contractService: ContractService,
 
   ) { }
 
 
   async createFullSale(createSaleDto: CreateSaleDto) {
+
+    // "По договору": kontragent majburiy (shartnoma shu mijoz bilan tuziladi).
+    const byContract = (createSaleDto.payments ?? []).some((payment) => payment.method === CONTRACT_METHOD);
+    if (byContract && !createSaleDto.customer_id) {
+      throw new BadRequestException('Для продажи по договору выберите контрагента');
+    }
 
     let total:number = 0;
 
@@ -76,10 +85,26 @@ export class SaleService {
     // Telegram ga (javobni kutmasdan — internet boʻlmasa ham savdo oʻtadi).
     this.telegramBot.notifySale(sale.id);
 
-    return this.saleRepository.findOne({
+    const created = await this.saleRepository.findOne({
       where: { id: sale.id },
       relations: ['items', 'payments']
     });
+
+    // "По договору": shartnoma va kuzatuv vazifasi avtomatik ochiladi. Savdo allaqachon yozilgan,
+    // shuning uchun shartnoma ochilmasa savdo bekor bo'lmaydi: xato javobda qaytadi (admin qayta urinishi mumkin).
+    let contract: { id: number; number: string } | null = null;
+    let contractError: string | null = null;
+    if (byContract) {
+      try {
+        const made = await this.contractService.createFromSale(sale.id);
+        contract = { id: made.id, number: made.number };
+      } catch (error) {
+        contractError = error instanceof Error ? error.message : 'Не удалось создать договор';
+        new Logger(SaleService.name).error(`Sale #${sale.id}: договор не создан: ${contractError}`);
+      }
+    }
+
+    return Object.assign(created as Sale, { contract, contractError });
   }
 
 

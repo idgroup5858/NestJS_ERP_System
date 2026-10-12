@@ -1,6 +1,7 @@
-import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, UnauthorizedException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
@@ -161,6 +162,55 @@ export class UserService implements OnApplicationBootstrap {
     await this.userRepository.save(user) 
 
     return user;
+  }
+
+  /** Profil uchun xavfsiz ko'rinish: parol xeshi va bog'lanishlarsiz. */
+  private profileOf(user: User) {
+    return {
+      id: user.id,
+      username: user.username,
+      surname: user.surname,
+      phone: user.phone,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
+  }
+
+  async getProfile(id: number) {
+    const user = await this.userRepository.findOneBy({id});
+    if(!user) throw new NotFoundException("Сотрудник не найден");
+    return this.profileOf(user);
+  }
+
+  /**
+   * Xodim o'z ma'lumotlarini o'zgartiradi. Rol bu yerda o'zgarmaydi; yangi parol uchun
+   * joriy parol tekshiriladi; email boshqa xodimda band bo'lsa 409.
+   */
+  async updateProfile(id: number, dto: UpdateProfileDto) {
+    const user = await this.userRepository.findOneBy({id});
+    if(!user) throw new NotFoundException("Сотрудник не найден");
+
+    if(dto.newPassword){
+      if(!dto.currentPassword) throw new BadRequestException("Введите текущий пароль");
+      if(!(await bcrypt.compare(dto.currentPassword, user.password))){
+        throw new BadRequestException("Текущий пароль указан неверно");
+      }
+      user.password = await bcrypt.hash(dto.newPassword, 10);
+    }
+
+    if(dto.email !== undefined && dto.email !== user.email){
+      const taken = await this.userRepository.findOneBy({email: dto.email});
+      if(taken) throw new ConflictException("Этот адрес электронной почты уже используется другим сотрудником");
+      user.email = dto.email;
+    }
+
+    if(dto.username !== undefined) user.username = dto.username;
+    if(dto.surname !== undefined) user.surname = dto.surname;
+    if(dto.phone !== undefined) user.phone = dto.phone;
+
+    await this.userRepository.save(user);
+    return this.profileOf(user);
   }
 
   async updateTg(id:number,tgUpdateDto:TgUpdateDto){

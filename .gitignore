@@ -1,5 +1,7 @@
 # compiled output
 /dist
+# biriktirilgan fayllar (shartnoma va vazifalar)
+/storage
 /node_modules
 /build
 

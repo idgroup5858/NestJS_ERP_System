@@ -1,4 +1,2 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateTaskDto } from './create-task.dto';
-
-export class UpdateTaskDto extends PartialType(CreateTaskDto) {}
+// UpdateTaskDto `create-task.dto.ts` da: null qiymatlar ("tozalash") va tarix uchun `user_id` bor.
+export { UpdateTaskDto } from './create-task.dto';
