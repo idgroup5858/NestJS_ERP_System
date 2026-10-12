@@ -11,5 +11,6 @@ import { TaskStage } from './entities/task_stage.entity';
   imports:[TypeOrmModule.forFeature([TaskPipeline, TaskStage])],
   controllers: [TaskPipelineController, TaskStageController],
   providers: [TaskPipelineService, TaskStageService],
+  exports: [TaskPipelineService],
 })
 export class TaskPipelineModule {}

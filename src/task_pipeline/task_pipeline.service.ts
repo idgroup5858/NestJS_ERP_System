@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateTaskPipelineDto } from './dto/create-task_pipeline.dto';
@@ -25,7 +25,7 @@ export class TaskPipelineService implements OnModuleInit {
   async ensureDefaults() {
     if ((await this.pipelines.count()) === 0) {
       for (const [index, definition] of DEFAULT_PIPELINES.entries()) {
-        await this.createWithStages(definition.name, index + 1, definition.stages);
+        await this.createWithStages(definition.name, index + 1, definition.stages, Boolean(definition.forContracts));
       }
       return;
     }
@@ -36,6 +36,28 @@ export class TaskPipelineService implements OnModuleInit {
       .where('s.id IS NULL')
       .getMany();
     for (const pipeline of empty) await this.addStages(pipeline, FALLBACK_STAGES);
+
+    await this.ensureContractPipeline();
+  }
+
+  /**
+   * Shartnoma vazifalari tushadigan voronka (`forContracts`). Belgilangani bo'lmasa: "По договору" nomlisi
+   * belgilanadi, u ham bo'lmasa standart "По договору" voronkasi yaratiladi. Hech qachon oddiy
+   * ("Обычная задача") voronkaga ketmaydi.
+   */
+  async ensureContractPipeline(): Promise<TaskPipeline> {
+    const flagged = await this.pipelines.findOne({ where: { forContracts: true }, order: { order_id: 'ASC', id: 'ASC' } });
+    if (flagged) return flagged;
+
+    const byName = await this.pipelines.findOne({ where: { name: 'По договору' } });
+    if (byName) {
+      byName.forContracts = true;
+      return this.pipelines.save(byName);
+    }
+
+    const definition = DEFAULT_PIPELINES.find((item) => item.forContracts) ?? DEFAULT_PIPELINES[0];
+    const last = await this.pipelines.createQueryBuilder('p').select('MAX(p.order_id)', 'max').getRawOne<{ max: number | null }>();
+    return this.createWithStages(definition.name, (last?.max ?? 0) + 1, definition.stages, true);
   }
 
   private async addStages(pipeline: TaskPipeline, definitions: DefaultStage[]) {
@@ -46,8 +68,8 @@ export class TaskPipelineService implements OnModuleInit {
     })));
   }
 
-  private async createWithStages(name: string, order: number, definitions: DefaultStage[]) {
-    const pipeline = await this.pipelines.save(this.pipelines.create({ name, order_id: order }));
+  private async createWithStages(name: string, order: number, definitions: DefaultStage[], forContracts = false) {
+    const pipeline = await this.pipelines.save(this.pipelines.create({ name, order_id: order, forContracts }));
     await this.addStages(pipeline, definitions);
     return pipeline;
   }
@@ -98,6 +120,15 @@ export class TaskPipelineService implements OnModuleInit {
       pipeline.name = dto.name;
     }
     if (dto.order_id !== undefined) pipeline.order_id = dto.order_id;
+
+    if (dto.forContracts !== undefined && dto.forContracts !== pipeline.forContracts) {
+      if (!dto.forContracts) {
+        throw new BadRequestException('Воронка для договоров всегда должна быть: отметьте для этого другую воронку');
+      }
+      // Belgi bitta voronkada: avvalgisidan olinadi.
+      await this.pipelines.update({ forContracts: true }, { forContracts: false });
+      pipeline.forContracts = true;
+    }
     await this.pipelines.save(pipeline);
 
     return this.findOne(id);
@@ -109,6 +140,9 @@ export class TaskPipelineService implements OnModuleInit {
       .where('p.id = :id', { id })
       .getOne() as (TaskPipeline & { tasksCount: number }) | null;
     if (!pipeline) throw new NotFoundException('Воронка не найдена');
+    if (pipeline.forContracts) {
+      throw new ConflictException('Это воронка для договоров: сначала отметьте для договоров другую воронку.');
+    }
     if (pipeline.tasksCount > 0) {
       throw new ConflictException(`В воронке есть задачи (${pipeline.tasksCount}). Сначала удалите или перенесите их.`);
     }

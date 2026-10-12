@@ -5,6 +5,7 @@ import { AttachmentService } from 'src/attachment/attachment.service';
 import { Contract } from 'src/contract/entities/contract.entity';
 import { Customer } from 'src/customer/entities/customer.entity';
 import { TaskPipeline } from 'src/task_pipeline/entities/task_pipeline.entity';
+import { TaskPipelineService } from 'src/task_pipeline/task_pipeline.service';
 import { TaskStage } from 'src/task_pipeline/entities/task_stage.entity';
 import { sortStages, taskState } from 'src/task_pipeline/task-stages';
 import { User } from 'src/user/entities/user.entity';
@@ -111,6 +112,7 @@ export class TaskService {
     private readonly contracts: Repository<Contract>,
     @InjectRepository(Customer)
     private readonly customers: Repository<Customer>,
+    private readonly pipelineService: TaskPipelineService,
     private readonly files: AttachmentService,
   ) { }
 
@@ -195,7 +197,7 @@ export class TaskService {
       .addSelect(['sb.id', 'sb.username', 'sb.surname'])
       .addSelect(['ab.id', 'ab.username', 'ab.surname'])
       .addSelect(['pt.id', 'pt.username', 'pt.surname'])
-      .addSelect(['ct.id', 'ct.number', 'ct.subject', 'ct.status'])
+      .addSelect(['ct.id', 'ct.number', 'ct.subject', 'ct.status', 'ct.amount', 'ct.currency'])
       .addSelect(['cu.id', 'cu.username', 'cu.surname', 'cu.phone'])
       .loadRelationCountAndMap('t.attachmentsCount', 't.attachments');
   }
@@ -231,7 +233,14 @@ export class TaskService {
         : null,
       state: taskState(task.stage?.type),
       contract: task.contract
-        ? { id: task.contract.id, number: task.contract.number, subject: task.contract.subject, status: task.contract.status }
+        ? {
+          id: task.contract.id,
+          number: task.contract.number,
+          subject: task.contract.subject,
+          status: task.contract.status,
+          amount: task.contract.amount,
+          currency: task.contract.currency,
+        }
         : null,
       customer: task.customer
         ? { id: task.customer.id, username: task.customer.username, surname: task.customer.surname, phone: task.customer.phone }
@@ -460,6 +469,24 @@ export class TaskService {
       .getRawMany<{ stageId: number; count: string }>();
     const total = new Map(counts.map((row) => [Number(row.stageId), Number(row.count)]));
 
+    // Etapdagi shartnomalar summasi (valyuta bo'yicha): ustun tepasida ko'rsatiladi. Bitta shartnoma bir
+    // etapda faqat bir marta sanaladi (unga bir nechta vazifa bog'langan bo'lsa ham). Doskada ko'rinmagan
+    // (yopilganlarning eskilari) ham hisobga olinadi.
+    const amountRows = await this.applyFilter(this.lightQuery(), filter)
+      .andWhere('ct.id IS NOT NULL')
+      .select('st.id', 'stageId')
+      .addSelect('ct.id', 'contractId')
+      .addSelect('ct.amount', 'amount')
+      .addSelect('ct.currency', 'currency')
+      .distinct(true)
+      .getRawMany<{ stageId: number; contractId: number; amount: string; currency: string }>();
+    const amounts = new Map<number, Record<string, number>>();
+    for (const row of amountRows) {
+      const sums = amounts.get(Number(row.stageId)) ?? {};
+      sums[row.currency] = (sums[row.currency] ?? 0) + Number(row.amount);
+      amounts.set(Number(row.stageId), sums);
+    }
+
     const open = await NEWEST_FIRST_BY_DUE(
       this.applyFilter(this.fullQuery(), filter).andWhere(`st.type <> 'done'`),
     ).getMany();
@@ -488,6 +515,7 @@ export class TaskService {
         type: stage.type,
         order_id: stage.order_id,
         total: total.get(stage.id) ?? 0,
+        amounts: amounts.get(stage.id) ?? {},
         tasks: byStage.get(stage.id) ?? [],
       })),
     };
@@ -742,14 +770,14 @@ export class TaskService {
 
   /**
    * "По договору" savdosidan ochilgan shartnoma uchun kuzatuv vazifasini avtomatik ochadi (tizim ochadi,
-   * "faqat admin ochadi" qoidasi bu yerda amal qilmaydi). Jarayon — "По договору" (bo'lmasa birinchisi),
-   * etap — birinchi oddiy etap. Javobgar yo'q: shartnomani buxgalter olgach unga tayinlanadi.
+   * "faqat admin ochadi" qoidasi bu yerda amal qilmaydi). Voronka — shartnomalar uchun belgilangan
+   * (`forContracts`, nomi o'zgarsa ham), etap — birinchi oddiy etap. Hech qachon oddiy voronkaga tushmaydi.
+   * Javobgar yo'q: shartnomani buxgalter olgach unga tayinlanadi.
    */
   async createForContract(em: EntityManager, contract: Contract, creator: User | null) {
     const pipeline =
-      (await em.findOne(TaskPipeline, { where: { name: 'По договору' } })) ??
-      (await em.findOne(TaskPipeline, { where: {}, order: { order_id: 'ASC', id: 'ASC' } }));
-    if (!pipeline) return null;
+      (await em.findOne(TaskPipeline, { where: { forContracts: true }, order: { order_id: 'ASC', id: 'ASC' } })) ??
+      (await this.pipelineService.ensureContractPipeline());
 
     const stages = sortStages(await em.find(TaskStage, { where: { pipeline: { id: pipeline.id } } }));
     const stage = stages.find((item) => item.type === 'normal');

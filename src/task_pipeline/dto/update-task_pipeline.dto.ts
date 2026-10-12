@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { IsInt, IsOptional, Min } from "class-validator";
+import { IsBoolean, IsInt, IsOptional, Min } from "class-validator";
 import { CreateTaskPipelineDto } from './create-task_pipeline.dto';
 
 export class UpdateTaskPipelineDto extends PartialType(CreateTaskPipelineDto) {
@@ -9,4 +9,12 @@ export class UpdateTaskPipelineDto extends PartialType(CreateTaskPipelineDto) {
     @IsInt()
     @Min(0)
     order_id?: number;
+
+    /**
+     * Shartnoma vazifalari shu voronkaga tushsin. Faqat `true` yuboriladi: avvalgisidan belgi olinadi.
+     * Belgini olib tashlab bo'lmaydi — boshqa voronkani belgilang.
+     */
+    @IsOptional()
+    @IsBoolean()
+    forContracts?: boolean;
 }

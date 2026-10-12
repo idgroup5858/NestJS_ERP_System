@@ -20,6 +20,13 @@ export class TaskPipeline {
     @Column()
     order_id:number;
 
+    /**
+     * Shartnoma ("По договору" savdosi) vazifalari shu voronkaga tushadi. Faqat bitta voronkada yoqiq turadi;
+     * voronka qayta nomlansa ham belgi saqlanadi (nomga bog'lanmagan).
+     */
+    @Column({ default: false })
+    forContracts:boolean;
+
     @OneToMany(() => TaskStage, stage => stage.pipeline)
     stages:TaskStage[]
 

@@ -33,7 +33,7 @@ const REVIEW: DefaultStage = { name: 'На проверке', color: 'warning', 
 const DONE: DefaultStage = { name: 'Закрыта', color: 'success', type: 'done' };
 
 /** Boshlang'ich jarayonlar; admin keyin tahrirlaydi. Nomlar bazadagi boshqa ma'lumotlar kabi ruscha. */
-export const DEFAULT_PIPELINES: { name: string; stages: DefaultStage[] }[] = [
+export const DEFAULT_PIPELINES: { name: string; forContracts?: boolean; stages: DefaultStage[] }[] = [
   {
     name: 'Обычная задача',
     stages: [
@@ -45,6 +45,7 @@ export const DEFAULT_PIPELINES: { name: string; stages: DefaultStage[] }[] = [
   },
   {
     name: 'По договору',
+    forContracts: true,
     stages: [
       { name: 'Новая', color: 'info', type: 'normal' },
       { name: 'Документы', color: 'neutral', type: 'normal' },

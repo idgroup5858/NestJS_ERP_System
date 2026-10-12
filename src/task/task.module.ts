@@ -10,9 +10,10 @@ import { User } from 'src/user/entities/user.entity';
 import { Contract } from 'src/contract/entities/contract.entity';
 import { Customer } from 'src/customer/entities/customer.entity';
 import { AttachmentModule } from 'src/attachment/attachment.module';
+import { TaskPipelineModule } from 'src/task_pipeline/task_pipeline.module';
 
 @Module({
-  imports:[TypeOrmModule.forFeature([Task, TaskEvent, TaskStage, TaskPipeline, User, Contract, Customer]), AttachmentModule],
+  imports:[TypeOrmModule.forFeature([Task, TaskEvent, TaskStage, TaskPipeline, User, Contract, Customer]), AttachmentModule, TaskPipelineModule],
   controllers: [TaskController],
   providers: [TaskService],
   exports: [TaskService],
