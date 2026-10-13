@@ -216,6 +216,8 @@ export class TaskListQueryDto {
 
     /** Shartnoma bo'yicha vazifalar. */
     @IsOptional() @Type(() => Number) @IsInt() contract_id?: number;
+    /** Kontragent bo'yicha vazifalar (kontragent kartochkasi). */
+    @IsOptional() @Type(() => Number) @IsInt() customer_id?: number;
     /** Faqat shartnomaga bog'langan vazifalar. */
     @IsOptional() @Transform(toBool) with_contract?: boolean;
 }

@@ -643,6 +643,62 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Profile (kartochka: jamlanma)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customer/profile/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customer",
+                "profile",
+                "1"
+              ]
+            },
+            "description": "Kontragent kartochkasi. customer (+ rekvizitlar), summary (savdo/qaytarish/xarid, to'langan, qarz, o'rtacha chek, sof aylanma = savdo − qaytarish, oxirgi operatsiya), paymentMethods (pul bilan to'langan usullar), topProducts (qaytarishlarni ayirib, 8 ta), months (oxirgi 12 oy). Qarz hisobi statistika bilan bir xil: max(0, jami − chegirma − to'lovlar), «Зачёт возврата» ham to'lov hisoblanadi."
+          },
+          "response": []
+        },
+        {
+          "name": "Operations (kartochka: tarix)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customer/operations/1?page=1&limit=10&type=sale",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customer",
+                "operations",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "type",
+                  "value": "sale",
+                  "description": "sale | return | purchase; yuborilmasa — hammasi",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Kontragent bilan barcha operatsiyalar (savdo, qaytarish, xarid), yangilari tepada. Har birida: net (jami − chegirma), paid, debt (faqat savdoda), saleId (savdodan qilingan qaytarishda), user, items[] va payments[]. limit ≤ 50."
+          },
+          "response": []
         }
       ]
     },
@@ -2690,6 +2746,12 @@
                 {
                   "key": "user_id",
                   "value": "1"
+                },
+                {
+                  "key": "customer_id",
+                  "value": "",
+                  "description": "Kontragent bo'yicha (kontragent kartochkasi)",
+                  "disabled": true
                 }
               ]
             },

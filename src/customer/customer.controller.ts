@@ -3,10 +3,15 @@ import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { ImportCustomerDto } from './dto/import-customer.dto';
+import { CustomerProfileService } from './customer-profile.service';
+import { CustomerOperationsQueryDto } from './dto/customer-operations-query.dto';
 
 @Controller('customer')
 export class CustomerController {
-  constructor(private readonly customerService: CustomerService) {}
+  constructor(
+    private readonly customerService: CustomerService,
+    private readonly profileService: CustomerProfileService,
+  ) {}
 
   @Post("add")
   create(@Body() createCustomerDto: CreateCustomerDto) {
@@ -38,6 +43,18 @@ export class CustomerController {
     @Query("search") search:string
   ) {
     return this.customerService.findAllPagSearch(+page,+limit,search);
+  }
+
+  /** Kontragent kartochkasi: ma'lumot, savdo/qaytarish/xarid jamlanmasi, to'lov usullari, top tovarlar, 12 oy. */
+  @Get('profile/:id')
+  profile(@Param('id') id: string) {
+    return this.profileService.profile(+id);
+  }
+
+  /** Kontragent bilan barcha operatsiyalar (savdo, qaytarish, xarid): qatorlar va to'lovlar bilan, sahifalangan. */
+  @Get('operations/:id')
+  operations(@Param('id') id: string, @Query() query: CustomerOperationsQueryDto) {
+    return this.profileService.operations(+id, query.page ?? 1, query.limit ?? 10, query.type);
   }
 
   @Get('getby/:id')

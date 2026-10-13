@@ -209,6 +209,7 @@ export class TaskService {
     if (f.responsible_id) query.andWhere('rs.id = :responsibleId', { responsibleId: f.responsible_id });
     if (f.creator_id) query.andWhere('cr.id = :creatorId', { creatorId: f.creator_id });
     if (f.contract_id) query.andWhere('ct.id = :contractId', { contractId: f.contract_id });
+    if (f.customer_id) query.andWhere('cu.id = :customerId', { customerId: f.customer_id });
     if (f.with_contract) query.andWhere('ct.id IS NOT NULL');
     if (f.member_id) query.andWhere(MEMBER_SQL, { memberId: f.member_id });
     if (f.overdue) query.andWhere(OVERDUE_SQL);
