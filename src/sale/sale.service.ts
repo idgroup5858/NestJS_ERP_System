@@ -32,11 +32,8 @@ export class SaleService {
 
   async createFullSale(createSaleDto: CreateSaleDto) {
 
-    // "По договору": kontragent majburiy (shartnoma shu mijoz bilan tuziladi).
+    // "По договору": kontragent majburiy emas — buxgalter uni shartnoma kartochkasida tanlaydi yoki ochadi.
     const byContract = (createSaleDto.payments ?? []).some((payment) => payment.method === CONTRACT_METHOD);
-    if (byContract && !createSaleDto.customer_id) {
-      throw new BadRequestException('Для продажи по договору выберите контрагента');
-    }
 
     let total:number = 0;
 

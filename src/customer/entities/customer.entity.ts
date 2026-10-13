@@ -16,13 +16,15 @@ export class Customer {
         @Column()
         surname: string;
     
-        @Column({unique:true})
-        phone: string;
+        /** Odamda majburiy; tashkilotda ixtiyoriy (NULL — bir nechta tashkilotda takrorlanishi mumkin). */
+        @Column({ type: 'varchar', unique: true, nullable: true })
+        phone: string | null;
     
           
         @Column({default:0})
         balance: number;
     
+        /** 'user' (odam, standart) yoki 'organization' (tashkilot: nomi `orgName`, `username` shundan olinadi). */
         @Column({default:null})
         type: string;
     

@@ -17,6 +17,7 @@ import {
   ContractListQueryDto,
   ContractNoteDto,
   ContractPaymentDto,
+  ContractCustomerDto,
   ContractRequisitesDto,
   ContractStatusDto,
   CreateContractDto,
@@ -47,6 +48,8 @@ const customerBrief = (customer?: Customer | null) =>
       username: customer.username,
       surname: customer.surname,
       phone: customer.phone,
+      /** 'organization' — tashkilot (kartochkada "Организация" ko'rsatiladi), aks holda odam. */
+      type: customer.type === 'organization' ? 'organization' : 'user',
       // Bank rekvizitlari (kontragent kartasida saqlanadi).
       requisites: {
         orgName: customer.orgName ?? null,
@@ -181,7 +184,7 @@ export class ContractService {
     return this.lightQuery()
       .leftJoin('c.submittedBy', 'sb')
       .leftJoin('c.approvedBy', 'ab')
-      .addSelect(['cu.id', 'cu.username', 'cu.surname', 'cu.phone'])
+      .addSelect(['cu.id', 'cu.username', 'cu.surname', 'cu.phone', 'cu.type'])
       .addSelect(['cu.orgName', 'cu.inn', 'cu.bankName', 'cu.mfo', 'cu.account', 'cu.address', 'cu.director'])
       .addSelect(['sl.id'])
       .addSelect(['rs.id', 'rs.username', 'rs.surname'])
@@ -633,7 +636,7 @@ export class ContractService {
       relations: { customer: true, user: true, items: { product: true } },
     });
     if (!sale) throw new NotFoundException('Продажа не найдена');
-    if (!sale.customer) throw new BadRequestException('Для договора нужен контрагент: выберите его в продаже');
+    // Kontragent bo'lmasligi mumkin: buxgalter uni shartnoma kartochkasida tanlaydi (`setCustomer`).
 
     const names = (sale.items ?? []).slice(0, 3).map((item) => `${item.product?.name ?? '—'} × ${item.quantity}`);
     const more = (sale.items?.length ?? 0) > 3 ? `, +${sale.items.length - 3}` : '';
@@ -643,7 +646,7 @@ export class ContractService {
       const contract = await em.save(em.create(Contract, {
         number: `tmp-${randomUUID()}`,
         subject,
-        customer: sale.customer,
+        customer: sale.customer ?? null,
         sale,
         amount: Math.max(0, sale.total - sale.discount),
         currency: 'UZS',
@@ -706,6 +709,44 @@ export class ContractService {
     return this.findOne(id);
   }
 
+  /**
+   * Kontragent tanlash: savdodan kontragentsiz ochilgan shartnomada buxgalter (yoki admin) uni belgilaydi.
+   * Faqat kontragent hali yo'q bo'lganda. Savdo va shartnomadagi vazifalarda ham kontragent bo'sh bo'lsa — shu qo'yiladi
+   * (qarz va tarix to'g'ri mijozga yozilishi uchun).
+   */
+  async setCustomer(id: number, dto: ContractCustomerDto) {
+    const actor = await this.requireUser(dto.user_id);
+    const contract = await this.contracts.findOne({
+      where: { id },
+      relations: { customer: true, responsible: true, sale: { customer: true } },
+    });
+    if (!contract) throw new NotFoundException('Договор не найден');
+    this.assertCanWork(contract, actor);
+    if (contract.customer) {
+      throw new BadRequestException('У договора уже указан контрагент — изменить его нельзя');
+    }
+    const customer = await this.requireCustomer(dto.customer_id);
+
+    await this.contracts.manager.transaction(async (em) => {
+      contract.customer = customer;
+      await em.save(contract);
+
+      if (contract.sale && !contract.sale.customer) {
+        await em.update(Sale, { id: contract.sale.id }, { customer: { id: customer.id } as Customer });
+      }
+      await em.createQueryBuilder()
+        .update(Task)
+        .set({ customer: { id: customer.id } as Customer })
+        .where('"contractId" = :id AND "customerId" IS NULL', { id })
+        .execute();
+
+      await this.log(em, contract, actor, 'updated', {
+        note: `Изменено: контрагент: — → ${`${customer.username} ${customer.surname}`.trim()}`,
+      });
+    });
+    return this.findOne(id);
+  }
+
   /** Kontragent rekvizitlari: faqat o'zgargan maydonlar yoziladi; tarixga qaysilari o'zgargani yoziladi. */
   async setRequisites(id: number, dto: ContractRequisitesDto) {
     const actor = await this.requireUser(dto.user_id);
@@ -715,14 +756,22 @@ export class ContractService {
     if (!contract.customer) throw new BadRequestException('У договора нет контрагента — реквизиты записывать некуда');
 
     const customer = contract.customer;
+    const organization = customer.type === 'organization';
     const changed: string[] = [];
     for (const [field, label] of Object.entries(REQUISITE_FIELDS) as [keyof typeof REQUISITE_FIELDS, string][]) {
       if (dto[field] === undefined) continue;
       const next = dto[field]!.trim() || null;
+      // Tashkilotning nomi o'chirilmaydi (u kontragent nomi sifatida hamma joyda ko'rinadi).
+      if (organization && field === 'orgName' && !next) continue;
       if (next !== (customer[field] ?? null)) {
         customer[field] = next;
         changed.push(label);
       }
+    }
+    // Tashkilotda kontragent nomi (username) tashkilot nomi bilan bir xil turadi.
+    if (organization && customer.orgName && customer.username !== customer.orgName) {
+      customer.username = customer.orgName;
+      customer.surname = '';
     }
 
     if (changed.length) {

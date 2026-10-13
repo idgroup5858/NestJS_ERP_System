@@ -155,6 +155,21 @@ export class ContractNoteDto {
 /** Rekvizitlar (kontragent kartasiga yoziladi). Bo'sh qator — maydonni tozalaydi; yuborilmasa — o'zgarmaydi. */
 const digits = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.replace(/\s+/g, '') : value);
 
+/**
+ * Kontragentsiz ochilgan (savdodan, "По договору") shartnomaga kontragent biriktirish.
+ * Faqat shartnomani olgan buxgalter yoki admin; kontragent allaqachon bor bo'lsa — rad etiladi.
+ */
+export class ContractCustomerDto {
+
+    @IsInt()
+    @Min(1)
+    user_id: number;
+
+    @IsInt()
+    @Min(1)
+    customer_id: number;
+}
+
 export class ContractRequisitesDto {
 
     @IsInt()

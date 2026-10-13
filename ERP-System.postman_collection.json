@@ -452,13 +452,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"Vali\",\n  \"surname\": \"Aliyev\",\n  \"phone\": \"+998901112233\",\n  \"type\": \"regular\",\n  \"balance\": 0\n}",
+              "raw": "{\n  \"type\": \"user\",\n  \"username\": \"Alisher\",\n  \"surname\": \"Karimov\",\n  \"phone\": \"+998901234567\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Odam (type: user, standart): username, surname, phone majburiy. Tashkilot (type: organization): faqat orgName majburiy — phone va rekvizitlar (inn, bankName, mfo, account, address, director) ixtiyoriy; username nomdan avtomatik olinadi. Misol (tashkilot): {\"type\":\"organization\",\"orgName\":\"Romashka MChJ\",\"inn\":\"305123456\"}"
           },
           "response": []
         },
@@ -566,10 +567,16 @@
                 {
                   "key": "search",
                   "value": "Vali"
+                },
+                {
+                  "key": "type",
+                  "value": "organization",
+                  "description": "organization — faqat tashkilotlar, user — faqat odamlar; yuborilmasa — hammasi aralash",
+                  "disabled": true
                 }
               ]
             },
-            "description": "search so'zma-so'z: har bir so'z ism, familiya yoki telefondan birida bo'lishi kerak (\"Alisher Karimov\", \"Karimov Alis\", \"90 123\"). Vazifa/shartnoma kontragent tanlagichi shuni ishlatadi."
+            "description": "search so'zma-so'z: har bir so'z ism, familiya yoki telefondan birida bo'lishi kerak (\"Alisher Karimov\", \"Karimov Alis\", \"90 123\"). Vazifa/shartnoma kontragent tanlagichi shuni ishlatadi. Qidiruv ism, familiya, telefon, tashkilot nomi va STIR bo'yicha."
           },
           "response": []
         },
@@ -621,7 +628,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Yuborilmagan maydon o'zgarmaydi. Tashkilotda orgName o'zgarsa username ham o'zgaradi; bo'sh satr ixtiyoriy maydonni tozalaydi. Turi (type) odatda o'zgartirilmaydi."
           },
           "response": []
         },
@@ -4034,6 +4042,40 @@
               ]
             },
             "description": "Faqat Admin. Fayllari ham o'chadi; vazifalar shartnomasiz qoladi."
+          },
+          "response": []
+        },
+        {
+          "name": "Customer (set: kontragentsiz shartnomaga)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contract/customer/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contract",
+                "customer",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 3,\n  \"customer_id\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Savdodan ochilgan, kontragentsiz shartnomaga kontragent (odam yoki tashkilot) biriktiradi. Faqat shartnomani olgan buxgalter yoki admin; kontragent allaqachon bo'lsa 400. Savdo va shartnomadagi vazifalarda ham kontragent bo'sh bo'lsa, shu qo'yiladi. \"По договору\" savdosida customer_id endi majburiy emas."
           },
           "response": []
         }

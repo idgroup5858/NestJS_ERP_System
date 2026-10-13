@@ -40,9 +40,11 @@ export class CustomerController {
   findAllPagSearch(
     @Query("page") page:string,
     @Query("limit") limit:string,
-    @Query("search") search:string
+    @Query("search") search:string,
+    // organization — faqat tashkilotlar, user — faqat odamlar; yuborilmasa hammasi.
+    @Query("type") type?: string
   ) {
-    return this.customerService.findAllPagSearch(+page,+limit,search);
+    return this.customerService.findAllPagSearch(+page,+limit,search,type);
   }
 
   /** Kontragent kartochkasi: ma'lumot, savdo/qaytarish/xarid jamlanmasi, to'lov usullari, top tovarlar, 12 oy. */

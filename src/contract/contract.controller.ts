@@ -5,6 +5,7 @@ import {
   ContractListQueryDto,
   ContractNoteDto,
   ContractPaymentDto,
+  ContractCustomerDto,
   ContractRequisitesDto,
   ContractStatusDto,
   CreateContractDto,
@@ -51,6 +52,12 @@ export class ContractController {
   }
 
   /** Kontragent rekvizitlari (INN, bank, MFO, hisob raqami...): javobgar buxgalter yoki admin. */
+  /** Kontragentsiz shartnomaga kontragent (odam yoki tashkilot) biriktirish: javobgar buxgalter yoki admin. */
+  @Patch('customer/:id')
+  setCustomer(@Param('id', ParseIntPipe) id: number, @Body() dto: ContractCustomerDto) {
+    return this.contractService.setCustomer(id, dto);
+  }
+
   @Patch('requisites/:id')
   setRequisites(@Param('id', ParseIntPipe) id: number, @Body() dto: ContractRequisitesDto) {
     return this.contractService.setRequisites(id, dto);
