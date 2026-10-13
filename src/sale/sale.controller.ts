@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { SaleService } from './sale.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
+import { ChangeSaleCustomerDto } from './dto/change-sale-customer.dto';
 
 @Controller('sale')
 export class SaleController {
@@ -76,6 +77,12 @@ export class SaleController {
   @Get('detail/:id')
   findDetail(@Param('id') id: string) {
     return this.saleService.findDetail(+id);
+  }
+
+  /** Savdo qilingandan keyin kontragentni almashtirish (savdo, qaytarishlar va shartnoma birga o'tadi). */
+  @Patch('customer/:id')
+  changeCustomer(@Param('id') id: string, @Body() dto: ChangeSaleCustomerDto) {
+    return this.saleService.changeCustomer(+id, dto);
   }
 
   // @Patch('update/:id')

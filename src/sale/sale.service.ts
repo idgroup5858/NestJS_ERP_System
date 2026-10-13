@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
+import { ChangeSaleCustomerDto } from './dto/change-sale-customer.dto';
 import { Sale } from './entities/sale.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
@@ -11,6 +12,9 @@ import { ContractService } from 'src/contract/contract.service';
 import { StockService } from 'src/stock/stock.service';
 import { TelegramBotService } from 'src/telegram/telegram-bot.service';
 import { roundMoney, roundQuantity } from 'src/common/quantity';
+import { Customer } from 'src/customer/entities/customer.entity';
+import { Return } from 'src/return/entities/return.entity';
+import { User } from 'src/user/entities/user.entity';
 
 /** Savdoda chegirma umumiy summaning shu foizidan oshmasligi kerak. */
 const MAX_SALE_DISCOUNT_PERCENT = 20;
@@ -314,6 +318,39 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
       })),
       returnedTotal: returns.reduce((sum, r) => sum + r.total - r.discount, 0)
     };
+  }
+
+  /**
+   * Savdo qilingandan keyin kontragentni almashtirish (kassir adashib boshqasini tanlagan bo'lishi mumkin).
+   * Savdo bilan birga shu savdodan qilingan qaytarishlar va bog'langan shartnoma (vazifalari bilan) ham yangi
+   * kontragentga o'tadi — qarz, aylanma va tarix bitta kontragentda qoladi. Hammasi bitta tranzaksiyada.
+   * Yangilangan tafsilotni qaytaradi.
+   */
+  async changeCustomer(id: number, dto: ChangeSaleCustomerDto) {
+    await this.saleRepository.manager.transaction(async (em) => {
+      const sale = await em.findOne(Sale, { where: { id }, relations: { customer: true } });
+      if (!sale) throw new NotFoundException('Продажа не найдена');
+
+      const actor = await em.findOneBy(User, { id: dto.user_id });
+      if (!actor) throw new NotFoundException(`Пользователь #${dto.user_id} не найден`);
+
+      const customer = await em.findOneBy(Customer, { id: dto.customer_id });
+      if (!customer) throw new NotFoundException('Контрагент не найден');
+
+      if (sale.customer?.id === customer.id) {
+        throw new BadRequestException('Этот контрагент уже указан в продаже');
+      }
+
+      await em.update(Sale, { id }, { customer: { id: customer.id } as Customer });
+      await em.createQueryBuilder()
+        .update(Return)
+        .set({ customer: { id: customer.id } as Customer })
+        .where('"saleId" = :id', { id })
+        .execute();
+      await this.contractService.followSaleCustomer(em, id, customer, actor);
+    });
+
+    return this.findDetail(id);
   }
 
   // async update(id: number, updateSaleDto: UpdateSaleDto) {

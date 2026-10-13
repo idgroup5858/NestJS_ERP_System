@@ -1765,6 +1765,40 @@
           "response": []
         },
         {
+          "name": "Change customer (savdodan keyin kontragentni almashtirish)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sale/customer/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sale",
+                "customer",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 1,\n  \"customer_id\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Savdo qilingandan keyin kontragentni almashtiradi (kassir adashgan bo'lsa). Savdo bilan birga shu savdodan qilingan qaytarishlar va bog'langan shartnoma (uning vazifalari bilan) ham yangi kontragentga o'tadi — hammasi bitta tranzaksiyada; shartnoma tarixiga yozuv tushadi. Xuddi shu kontragent bo'lsa 400; yopilgan (closed) shartnoma bo'lsa 400 — avval admin uni qayta ochishi kerak. user_id — kim almashtirmoqda. Javob: yangilangan savdo tafsiloti (GET /sale/detail/:id bilan bir xil)."
+          },
+          "response": []
+        },
+        {
           "name": "Delete",
           "request": {
             "method": "DELETE",

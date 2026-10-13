@@ -747,6 +747,40 @@ export class ContractService {
     return this.findOne(id);
   }
 
+  /**
+   * Savdoning kontragenti almashtirilganda (savdo tafsilotidan) unga bog'langan shartnoma ham, uning vazifalari ham
+   * yangi kontragentga o'tadi — aks holda shartnoma bir kontragentda, qarz boshqasida qolardi. Savdo tranzaksiyasi
+   * ichida chaqiriladi (`em`): shartnoma o'zgarmasa, savdo ham o'zgarmaydi. Shartnoma bo'lmasa — hech narsa qilmaydi.
+   * Yopilgan (admin tasdiqlagan) shartnomada rad etiladi: avval admin uni qayta ochishi kerak.
+   */
+  async followSaleCustomer(em: EntityManager, saleId: number, customer: Customer, actor: User) {
+    const contract = await em.findOne(Contract, { where: { sale: { id: saleId } }, relations: { customer: true } });
+    if (!contract) return;
+    if (contract.status === 'closed') {
+      throw new BadRequestException(
+        'Договор по этой продаже закрыт — сначала администратор должен открыть его заново, затем можно менять контрагента',
+      );
+    }
+
+    const name = (value?: Customer | null) => (value ? `${value.username} ${value.surname}`.trim() : '—');
+    const before = contract.customer;
+    contract.customer = customer;
+    await em.save(contract);
+
+    // Vazifalar: shartnomaning o'z kontragentiga biriktirilganlari (yoki bo'shlari) o'tadi.
+    const tasks = em.createQueryBuilder().update(Task).set({ customer: { id: customer.id } as Customer });
+    if (before) {
+      tasks.where('"contractId" = :id AND ("customerId" IS NULL OR "customerId" = :old)', { id: contract.id, old: before.id });
+    } else {
+      tasks.where('"contractId" = :id AND "customerId" IS NULL', { id: contract.id });
+    }
+    await tasks.execute();
+
+    await this.log(em, contract, actor, 'updated', {
+      note: `Изменено: контрагент: ${name(before)} → ${name(customer)} (в продаже №${saleId})`,
+    });
+  }
+
   /** Kontragent rekvizitlari: faqat o'zgargan maydonlar yoziladi; tarixga qaysilari o'zgargani yoziladi. */
   async setRequisites(id: number, dto: ContractRequisitesDto) {
     const actor = await this.requireUser(dto.user_id);
