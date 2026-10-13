@@ -628,10 +628,20 @@ export class ContractService {
    * bor bo'lsa, o'shani qaytaradi. Summa = jami − chegirma; kontragent savdodan; javobgar yo'q ("свободный").
    */
   async createFromSale(saleId: number) {
-    const existing = await this.contracts.findOne({ where: { sale: { id: saleId } } });
-    if (existing) return this.findOne(existing.id);
+    const saved = await this.contracts.manager.transaction((em) => this.openForSale(em, saleId));
+    return this.findOne(saved.id);
+  }
 
-    const sale = await this.sales.findOne({
+  /**
+   * `createFromSale` ning tranzaksiya ichidagi qismi: chaqiruvchi o'z tranzaksiyasini (`em`) beradi, shu bois
+   * savdodagi o'zgarishlar (kontragent, to'lov) va shartnoma bir butun yoziladi. Shartnoma allaqachon bo'lsa — o'shani qaytaradi.
+   * `converted` — savdo avval oddiy to'langan, keyin "По договору" ga o'tkazilgan (tarix yozuvi shu haqda).
+   */
+  async openForSale(em: EntityManager, saleId: number, converted = false): Promise<Contract> {
+    const existing = await em.findOne(Contract, { where: { sale: { id: saleId } } });
+    if (existing) return existing;
+
+    const sale = await em.findOne(Sale, {
       where: { id: saleId },
       relations: { customer: true, user: true, items: { product: true } },
     });
@@ -642,32 +652,40 @@ export class ContractService {
     const more = (sale.items?.length ?? 0) > 3 ? `, +${sale.items.length - 3}` : '';
     const subject = `Продажа №${sale.id}: ${names.join(', ')}${more}`.slice(0, 2000);
 
-    const saved = await this.contracts.manager.transaction(async (em) => {
-      const contract = await em.save(em.create(Contract, {
-        number: `tmp-${randomUUID()}`,
-        subject,
-        customer: sale.customer ?? null,
-        sale,
-        amount: Math.max(0, sale.total - sale.discount),
-        currency: 'UZS',
-        contractDate: todayIso(),
-        status: 'draft',
-        responsible: null,
-        creator: sale.user ?? null,
-      }));
+    const contract = await em.save(em.create(Contract, {
+      number: `tmp-${randomUUID()}`,
+      subject,
+      customer: sale.customer ?? null,
+      sale,
+      amount: Math.max(0, sale.total - sale.discount),
+      currency: 'UZS',
+      contractDate: todayIso(),
+      status: 'draft',
+      responsible: null,
+      creator: sale.user ?? null,
+    }));
 
-      const free = !(await em.exists(Contract, { where: { number: pad(contract.id) } }));
-      contract.number = free ? pad(contract.id) : `${pad(contract.id)}-${randomUUID().slice(0, 4)}`;
-      await em.save(contract);
+    const free = !(await em.exists(Contract, { where: { number: pad(contract.id) } }));
+    contract.number = free ? pad(contract.id) : `${pad(contract.id)}-${randomUUID().slice(0, 4)}`;
+    await em.save(contract);
 
-      await this.log(em, contract, sale.user ?? null, 'created', {
-        toStatus: 'draft',
-        note: `Автоматически: продажа №${sale.id} по договору`,
-      });
-      await this.taskService.createForContract(em, contract, sale.user ?? null);
-      return contract;
+    await this.log(em, contract, sale.user ?? null, 'created', {
+      toStatus: 'draft',
+      note: converted
+        ? `Автоматически: продажа №${sale.id} оформлена по договору после продажи`
+        : `Автоматически: продажа №${sale.id} по договору`,
     });
-    return this.findOne(saved.id);
+    await this.taskService.createForContract(em, contract, sale.user ?? null);
+    return contract;
+  }
+
+  /** Savdoga bog'langan shartnoma qisqacha (tafsilot ekrani uchun) yoki `null`. */
+  async briefBySale(saleId: number) {
+    const contract = await this.contracts.findOne({
+      where: { sale: { id: saleId } },
+      select: { id: true, number: true, status: true },
+    });
+    return contract ? { id: contract.id, number: contract.number, status: contract.status } : null;
   }
 
   /** Admin uchun: avtomatik ochilmay qolgan bo'lsa qo'lda qayta urinish. */

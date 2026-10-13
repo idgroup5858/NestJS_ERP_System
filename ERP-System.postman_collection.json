@@ -1765,7 +1765,7 @@
           "response": []
         },
         {
-          "name": "Change customer (savdodan keyin kontragentni almashtirish)",
+          "name": "Change customer (savdodan keyin kontragent / \"По договору\")",
           "request": {
             "method": "PATCH",
             "header": [
@@ -1787,14 +1787,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"user_id\": 1,\n  \"customer_id\": 5\n}",
+              "raw": "{\n  \"user_id\": 1,\n  \"customer_id\": 5,\n  \"by_contract\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Savdo qilingandan keyin kontragentni almashtiradi (kassir adashgan bo'lsa). Savdo bilan birga shu savdodan qilingan qaytarishlar va bog'langan shartnoma (uning vazifalari bilan) ham yangi kontragentga o'tadi — hammasi bitta tranzaksiyada; shartnoma tarixiga yozuv tushadi. Xuddi shu kontragent bo'lsa 400; yopilgan (closed) shartnoma bo'lsa 400 — avval admin uni qayta ochishi kerak. user_id — kim almashtirmoqda. Javob: yangilangan savdo tafsiloti (GET /sale/detail/:id bilan bir xil)."
+            "description": "Savdo qilingandan keyin kontragentni almashtiradi (kassir adashgan bo'lsa) va/yoki savdoni \"По договору\" ga o'tkazadi. customer_id va by_contract dan kamida bittasi kerak. Kontragent: savdo bilan birga shu savdodan qilingan qaytarishlar va bog'langan shartnoma (vazifalari bilan) ham yangi kontragentga o'tadi; xuddi shu kontragent bo'lsa 400; yopilgan (closed) shartnoma bo'lsa 400. by_contract: true — shartnoma va kuzatuv vazifasi avtomatik ochiladi (javobgarsiz, buxgalter \"Взять в работу\" bosganda vazifa ham unga o'tadi); to'lovlarda summasi 0 bo'lgan \"По договору\" belgisi paydo bo'ladi, qarz o'zgarmaydi. Faqat qarzi qolgan va shartnomasi yo'q savdo uchun, aks holda 400. customer_id bermasdan faqat shartnoma ochish mumkin. Hammasi bitta tranzaksiyada. user_id — kim bajarmoqda. Javob: yangilangan savdo tafsiloti (GET /sale/detail/:id bilan bir xil, ichida contract: { id, number, status } yoki null)."
           },
           "response": []
         },

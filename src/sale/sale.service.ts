@@ -12,7 +12,9 @@ import { ContractService } from 'src/contract/contract.service';
 import { StockService } from 'src/stock/stock.service';
 import { TelegramBotService } from 'src/telegram/telegram-bot.service';
 import { roundMoney, roundQuantity } from 'src/common/quantity';
+import { Contract } from 'src/contract/entities/contract.entity';
 import { Customer } from 'src/customer/entities/customer.entity';
+import { Payment } from 'src/payment/entities/payment.entity';
 import { Return } from 'src/return/entities/return.entity';
 import { User } from 'src/user/entities/user.entity';
 
@@ -316,38 +318,73 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
         ...item,
         returned: roundQuantity(returnItems.reduce((sum, r) => sum + r.quantity, 0))
       })),
-      returnedTotal: returns.reduce((sum, r) => sum + r.total - r.discount, 0)
+      returnedTotal: returns.reduce((sum, r) => sum + r.total - r.discount, 0),
+      // Savdoga bog'langan shartnoma (bo'lmasa `null`): ekranda ko'rsatiladi, "По договору" ga o'tkazish uchun kerak.
+      contract: await this.contractService.briefBySale(id),
     };
   }
 
   /**
-   * Savdo qilingandan keyin kontragentni almashtirish (kassir adashib boshqasini tanlagan bo'lishi mumkin).
-   * Savdo bilan birga shu savdodan qilingan qaytarishlar va bog'langan shartnoma (vazifalari bilan) ham yangi
-   * kontragentga o'tadi — qarz, aylanma va tarix bitta kontragentda qoladi. Hammasi bitta tranzaksiyada.
-   * Yangilangan tafsilotni qaytaradi.
+   * Savdo qilingandan keyin kontragentni almashtirish (kassir adashib boshqasini tanlagan bo'lishi mumkin)
+   * va/yoki savdoni "По договору" ga o'tkazish. Hammasi bitta tranzaksiyada, shuning uchun yarim holat qolmaydi.
+   *
+   * - Kontragent: savdo bilan birga shu savdodan qilingan qaytarishlar va bog'langan shartnoma (vazifalari bilan)
+   *   ham yangi kontragentga o'tadi — qarz, aylanma va tarix bitta kontragentda qoladi.
+   * - `by_contract`: shartnoma va kuzatuv vazifasi xuddi kassadagi "По договору" savdosidagidek ochiladi
+   *   (javobgarsiz, "свободный" — buxgalter "Взять в работу" bosganda vazifa ham unga o'tadi). Qarz o'zgarmaydi:
+   *   to'lovni buxgalter bank o'tkazmasi sifatida kiritadi. Faqat qarzi qolgan va shartnomasi yo'q savdo uchun.
+   *
+   * Yangilangan tafsilotni qaytaradi (ichida `contract`).
    */
   async changeCustomer(id: number, dto: ChangeSaleCustomerDto) {
+    const wantsCustomer = dto.customer_id !== undefined && dto.customer_id !== null;
+    if (!wantsCustomer && !dto.by_contract) {
+      throw new BadRequestException('Укажите нового контрагента или оформите продажу по договору');
+    }
+
     await this.saleRepository.manager.transaction(async (em) => {
-      const sale = await em.findOne(Sale, { where: { id }, relations: { customer: true } });
+      const sale = await em.findOne(Sale, { where: { id }, relations: { customer: true, payments: true } });
       if (!sale) throw new NotFoundException('Продажа не найдена');
 
       const actor = await em.findOneBy(User, { id: dto.user_id });
       if (!actor) throw new NotFoundException(`Пользователь #${dto.user_id} не найден`);
 
-      const customer = await em.findOneBy(Customer, { id: dto.customer_id });
-      if (!customer) throw new NotFoundException('Контрагент не найден');
+      let customer: Customer | null = null;
+      if (wantsCustomer) {
+        customer = await em.findOneBy(Customer, { id: dto.customer_id });
+        if (!customer) throw new NotFoundException('Контрагент не найден');
+      }
 
-      if (sale.customer?.id === customer.id) {
+      const customerChanges = Boolean(customer) && sale.customer?.id !== customer!.id;
+      if (!customerChanges && !dto.by_contract) {
         throw new BadRequestException('Этот контрагент уже указан в продаже');
       }
 
-      await em.update(Sale, { id }, { customer: { id: customer.id } as Customer });
-      await em.createQueryBuilder()
-        .update(Return)
-        .set({ customer: { id: customer.id } as Customer })
-        .where('"saleId" = :id', { id })
-        .execute();
-      await this.contractService.followSaleCustomer(em, id, customer, actor);
+      if (customerChanges) {
+        await em.update(Sale, { id }, { customer: { id: customer!.id } as Customer });
+        await em.createQueryBuilder()
+          .update(Return)
+          .set({ customer: { id: customer!.id } as Customer })
+          .where('"saleId" = :id', { id })
+          .execute();
+        await this.contractService.followSaleCustomer(em, id, customer!, actor);
+      }
+
+      if (dto.by_contract) {
+        if (await em.exists(Contract, { where: { sale: { id } } })) {
+          throw new BadRequestException('По этой продаже уже есть договор');
+        }
+        const paid = sale.payments.reduce((sum, payment) => sum + payment.amount, 0);
+        if (Math.max(0, sale.total - sale.discount - paid) <= 0) {
+          throw new BadRequestException('Продажа полностью оплачена — оформить её по договору нельзя');
+        }
+
+        // Belgi: to'lovlar ro'yxatida "По договору" ko'rinadi (summa 0 — qarz o'zgarmaydi).
+        if (!sale.payments.some((payment) => payment.method.trim() === CONTRACT_METHOD)) {
+          await em.save(em.create(Payment, { sale: { id } as Sale, method: CONTRACT_METHOD, amount: 0 }));
+        }
+        await this.contractService.openForSale(em, id, true);
+      }
     });
 
     return this.findDetail(id);
