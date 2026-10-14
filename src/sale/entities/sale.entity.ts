@@ -2,6 +2,7 @@ import { Customer } from "src/customer/entities/customer.entity";
 import { Payment } from "src/payment/entities/payment.entity";
 import { Return } from "src/return/entities/return.entity";
 import { SaleItem } from "src/sale_items/entities/sale_item.entity";
+import { SaleMasterFee } from "./sale-master-fee.entity";
 import { User } from "src/user/entities/user.entity";
 import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
@@ -24,6 +25,10 @@ export class Sale {
     @OneToMany(() => Return, returns => returns.sale)
     returns: Return[];
 
+
+    // Usta xizmati haqi (savdo summasiga kirmaydi, alohida hisoblanadi).
+    @OneToMany(() => SaleMasterFee, fee => fee.sale)
+    masterFees: SaleMasterFee[];
 
     @ManyToOne(() => Customer, customer => customer.sale)
     customer:Customer;

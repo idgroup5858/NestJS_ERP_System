@@ -3,6 +3,7 @@ import { SaleService } from './sale.service';
 import { SaleController } from './sale.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Sale } from './entities/sale.entity';
+import { SaleMasterFee } from './entities/sale-master-fee.entity';
 import { SaleItemsModule } from 'src/sale_items/sale_items.module';
 import { PaymentModule } from 'src/payment/payment.module';
 import { StockModule } from 'src/stock/stock.module';
@@ -10,7 +11,7 @@ import { TelegramModule } from 'src/telegram/telegram.module';
 import { ContractModule } from 'src/contract/contract.module';
 
 @Module({
-  imports:[SaleItemsModule,PaymentModule,StockModule,TelegramModule,ContractModule,TypeOrmModule.forFeature([Sale])],
+  imports:[SaleItemsModule,PaymentModule,StockModule,TelegramModule,ContractModule,TypeOrmModule.forFeature([Sale, SaleMasterFee])],
   controllers: [SaleController],
   providers: [SaleService],
 })

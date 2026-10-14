@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { MasterOrderService } from './master_order.service';
 import {
   CancelMasterOrderDto, CompleteMasterOrderDto, CreateMasterOrderDto, SetMasterOrderStatusDto
@@ -87,6 +87,14 @@ export class MasterOrderController {
   @Patch('status/:id')
   setStatus(@Param('id', ParseIntPipe) id: number, @Body() dto: SetMasterOrderStatusDto) {
     return this.masterOrderService.setStatus(id, dto.status);
+  }
+
+  /** Zakazni o'chirish — faqat admin (`user_id` hozircha so'rovdan, keyin tokendan). */
+  @Delete('delete/:id')
+  remove(@Param('id', ParseIntPipe) id: number, @Query('user_id') userId: string) {
+    const actorId = Number(userId);
+    if (!Number.isInteger(actorId) || actorId < 1) throw new BadRequestException('user_id обязателен');
+    return this.masterOrderService.remove(id, actorId);
   }
 
   @Post('complete/:id')

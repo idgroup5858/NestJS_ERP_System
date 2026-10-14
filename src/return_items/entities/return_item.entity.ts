@@ -19,7 +19,7 @@ export class ReturnItem {
     @ManyToOne(() => Return, returns => returns.items, { onDelete: "CASCADE" })
     returns: Return;
 
-    @ManyToOne(() => Product)
+    @ManyToOne(() => Product, { nullable: true, onDelete: 'SET NULL' })
     product: Product;
 
     @ManyToOne(() => Warehouse)

@@ -17,7 +17,7 @@ export class PurchaseItem {
         @ManyToOne(() => Purchase, purchase => purchase.items,{onDelete:"CASCADE"})
         purchase: Purchase;
 
-        @ManyToOne(() => Product)
+        @ManyToOne(() => Product, { nullable: true, onDelete: 'SET NULL' })
         product: Product;
 
         @ManyToOne(() => Warehouse)

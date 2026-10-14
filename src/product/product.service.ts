@@ -407,14 +407,59 @@ export class ProductService {
   // }
 
   
-      async remove(id: number) {
+      /**
+       * Mahsulot qayerlarda ishlatilgani (o'chirishdan oldin foydalanuvchiga ko'rsatish uchun):
+       * ustalar zakazlari (o'chirilganda zakazdan tovar ham o'chadi) va savdo / kirim / qaytarish qatorlari
+       * (ular saqlanadi, faqat mahsulot "Товар удалён" bo'lib qoladi).
+       */
+      async usage(id: number) {
+        const exists = await this.productRepository.exists({ where: { id } });
+        if (!exists) throw new NotFoundException("Не найден Продукт");
+
+        const [row] = await this.productRepository.query(
+          `SELECT
+             (SELECT count(*) FROM master_order_item WHERE "productId" = $1) AS master_items,
+             (SELECT count(DISTINCT "orderId") FROM master_order_item WHERE "productId" = $1) AS master_orders,
+             (SELECT count(DISTINCT "saleId") FROM sale_item WHERE "productId" = $1) AS sales,
+             (SELECT count(DISTINCT "purchaseId") FROM purchase_item WHERE "productId" = $1) AS purchases,
+             (SELECT count(DISTINCT "returnsId") FROM return_item WHERE "productId" = $1) AS returns`,
+          [id],
+        );
+        const usage = {
+          masterOrders: Number(row.master_orders),
+          sales: Number(row.sales),
+          purchases: Number(row.purchases),
+          returns: Number(row.returns),
+        };
+        return { ...usage, used: Object.values(usage).some((count) => count > 0) };
+      }
+
+      /**
+       * O'chirish. Mahsulot ishlatilgan bo'lsa, `confirm` bo'lmasa 409 qaytadi (ichida `usage`): ekran so'raydi,
+       * foydalanuvchi rozi bo'lsa `confirm=true` bilan qayta yuboriladi. Zakazdagi qator o'chadi (CASCADE),
+       * savdo/kirim/qaytarish qatorlari saqlanadi (SET NULL).
+       */
+      async remove(id: number, confirm = false) {
         const checkProduct = await this.productRepository.findOneBy({ id });
 
         if (!checkProduct) {
           throw new NotFoundException("Не найден Продукт");
         }
 
-        // 1. image o‘chirish (xavfsiz variant)
+        const usage = await this.usage(id);
+        if (usage.used && !confirm) {
+          throw new ConflictException({
+            statusCode: 409,
+            message: 'Товар используется в заказах или операциях. Подтвердите удаление.',
+            error: 'Conflict',
+            usage,
+          });
+        }
+
+        // 1. product o‘chirish (bog'liq yozuvlar bazada CASCADE / SET NULL bilan hal bo'ladi)
+        await this.productRepository.remove(checkProduct);
+
+        // 2. image o‘chirish — faqat product o'chgandan keyin
         if (checkProduct.imgUrl) {
           const fileName = checkProduct.imgUrl.split('/').pop();
 
@@ -426,9 +471,6 @@ export class ProductService {
             }
           }
         }
-
-        // 2. product o‘chirish
-        await this.productRepository.remove(checkProduct);
 
         return { message: "Продукт удален" };
       }

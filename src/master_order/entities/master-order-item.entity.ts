@@ -14,7 +14,7 @@ export class MasterOrderItem {
     @ManyToOne(() => MasterOrder, order => order.items, { onDelete: "CASCADE" })
     order: MasterOrder;
 
-    @ManyToOne(() => Product, { nullable: false })
+    @ManyToOne(() => Product, { nullable: false, onDelete: 'CASCADE' })
     product: Product;
 
     @Column(QUANTITY_COLUMN)

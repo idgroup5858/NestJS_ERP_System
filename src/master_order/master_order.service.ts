@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { roundMoney } from 'src/common/quantity';
@@ -359,6 +359,24 @@ export class MasterOrderService {
     });
 
     return this.findOne(id);
+  }
+
+  /**
+   * Zakazni o'chirish: faqat admin. Zakazdagi tovar qatorlari ham o'chadi (CASCADE); zakaz savdoga bog'langan
+   * bo'lsa, savdoning o'zi saqlanadi (bog'lanish faqat zakaz bilan birga yo'qoladi).
+   */
+  async remove(id: number, userId: number) {
+    const actor = await this.users.findOneBy({ id: userId });
+    if (!actor) throw new NotFoundException('Пользователь не найден');
+    if (actor.role?.trim().toLowerCase() !== 'admin') {
+      throw new ForbiddenException('Удалять заказы может только администратор');
+    }
+
+    const order = await this.orders.findOneBy({ id });
+    if (!order) throw new NotFoundException('Заказ не найден');
+
+    await this.orders.remove(order);
+    return { message: 'Заказ удалён' };
   }
 
   /** Savdo yaratilgandan keyin chaqiriladi: zakazni yakunlaydi va savdoga bog'laydi. */

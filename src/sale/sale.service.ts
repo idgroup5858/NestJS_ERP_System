@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateSaleDto, SaleMasterFeeDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { ChangeSaleCustomerDto } from './dto/change-sale-customer.dto';
 import { Sale } from './entities/sale.entity';
+import { SaleMasterFee } from './entities/sale-master-fee.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import { SaleItemsService } from 'src/sale_items/sale_items.service';
@@ -21,6 +22,9 @@ import { User } from 'src/user/entities/user.entity';
 /** Savdoda chegirma umumiy summaning shu foizidan oshmasligi kerak. */
 const MAX_SALE_DISCOUNT_PERCENT = 20;
 
+/** Bir savdodagi usta xizmatlari soni chegarasi. */
+const MAX_MASTER_FEES = 20;
+
 @Injectable()
 export class SaleService {
 
@@ -38,8 +42,13 @@ export class SaleService {
 
   async createFullSale(createSaleDto: CreateSaleDto) {
 
-    // "По договору": kontragent majburiy emas — buxgalter uni shartnoma kartochkasida tanlaydi yoki ochadi.
-    const byContract = (createSaleDto.payments ?? []).some((payment) => payment.method === CONTRACT_METHOD);
+    // Shartnoma ochilsinmi: kassada aniq tanlangan bo'lsa (`open_contract`) — shu; aks holda "По договору" to'lovi bo'lsa.
+    // Kontragent majburiy emas — buxgalter uni shartnoma kartochkasida tanlaydi yoki ochadi.
+    const byContract = createSaleDto.open_contract
+      ?? (createSaleDto.payments ?? []).some((payment) => payment.method === CONTRACT_METHOD);
+
+    // Usta xizmati haqi: savdo summasiga kirmaydi (alohida hisoblanadi) — oldindan tekshiriladi.
+    const masterFees = await this.normalizeMasterFees(createSaleDto.master_fees);
 
     let total:number = 0;
 
@@ -65,6 +74,17 @@ export class SaleService {
     });
 
     await this.saleRepository.save(sale);
+
+    if (masterFees.length > 0) {
+      await this.saleRepository.manager.save(
+        masterFees.map((fee) => this.saleRepository.manager.create(SaleMasterFee, {
+          sale: { id: sale.id } as Sale,
+          master: { id: fee.masterId } as User,
+          amount: fee.amount,
+          note: fee.note,
+        })),
+      );
+    }
 
     for (const item of createSaleDto.items) {
       await this.saleItemsService.create({
@@ -321,7 +341,254 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
       returnedTotal: returns.reduce((sum, r) => sum + r.total - r.discount, 0),
       // Savdoga bog'langan shartnoma (bo'lmasa `null`): ekranda ko'rsatiladi, "По договору" ga o'tkazish uchun kerak.
       contract: await this.contractService.briefBySale(id),
+      // Usta xizmati (savdo summasiga kirmaydi): ustaga beriladigan haqlar.
+      ...(await this.masterFeesOf(id)),
     };
+  }
+
+  /** Usta xizmati qatorlarini tekshiradi: usta mavjud, summa butun va musbat. */
+  private async normalizeMasterFees(fees?: SaleMasterFeeDto[]) {
+    if (!fees || fees.length === 0) return [];
+    if (!Array.isArray(fees) || fees.length > MAX_MASTER_FEES) {
+      throw new BadRequestException(`Услуг мастеров в одной продаже не больше ${MAX_MASTER_FEES}`);
+    }
+
+    const result: { masterId: number; amount: number; note: string | null }[] = [];
+    for (const fee of fees) {
+      const masterId = Number(fee?.master_id);
+      const amount = Number(fee?.amount);
+      if (!Number.isInteger(masterId) || masterId < 1) throw new BadRequestException('Выберите мастера для услуги');
+      if (!Number.isInteger(amount) || amount < 1 || amount > 1_000_000_000) {
+        throw new BadRequestException('Сумма услуги мастера должна быть целым числом больше нуля');
+      }
+      const master = await this.saleRepository.manager.findOneBy(User, { id: masterId });
+      if (!master) throw new BadRequestException(`Мастер #${masterId} не найден`);
+      const note = typeof fee.note === 'string' ? fee.note.trim().slice(0, 200) : '';
+      result.push({ masterId, amount, note: note || null });
+    }
+    return result;
+  }
+
+  /** Savdodagi usta xizmatlari va ularning yig'indisi (parol xeshi chiqmaydi). */
+  private async masterFeesOf(saleId: number) {
+    const rows: { id: number; amount: number; note: string | null; master_id: number | null; username: string | null; surname: string | null }[] =
+      await this.saleRepository.query(
+        `SELECT f.id, f.amount, f.note, u.id AS master_id, u.username, u.surname
+           FROM sale_master_fee f LEFT JOIN "user" u ON u.id = f."masterId"
+          WHERE f."saleId" = $1 ORDER BY f.id`,
+        [saleId],
+      );
+    const masterFees = rows.map((row) => ({
+      id: row.id,
+      amount: Number(row.amount),
+      note: row.note,
+      master: row.master_id ? { id: row.master_id, username: row.username, surname: row.surname } : null,
+    }));
+    return { masterFees, masterFeeTotal: masterFees.reduce((sum, fee) => sum + fee.amount, 0) };
+  }
+
+  /**
+   * Ustalar ro'yxati (sahifalab, qidiruv bilan): har bir usta nechta savdoda qatnashgani, shu savdolarning
+   * jami summasi (chegirmadan keyin) va jami haqi. `start`/`end` (YYYY-MM-DD) — savdo sanasi bo'yicha oraliq.
+   * `totals` — qidiruv va oraliqqa mos hamma ustalar bo'yicha (sahifaga bog'liq emas).
+   */
+  async masterFeesSummary(page = 1, limit = 10, search?: string, start?: string, end?: string) {
+    const safePage = page > 0 ? page : 1;
+    const safeLimit = limit > 0 ? Math.min(limit, 100) : 10;
+    const { where, params } = this.feeRange(start, end);
+    const conditions = [where];
+    const term = search?.trim();
+    if (term) {
+      params.push(`%${term}%`);
+      conditions.push(
+        `(u.username ILIKE $${params.length} OR u.surname ILIKE $${params.length}
+          OR concat_ws(' ', u.username, u.surname) ILIKE $${params.length})`,
+      );
+    }
+    const whereSql = conditions.join(' AND ');
+
+    // Bir savdoda bir usta bir necha qator olishi mumkin: avval (usta, savdo) bo'yicha jamlanadi, savdo summasi ikki marta sanalmaydi.
+    const base = `
+      WITH per_sale AS (
+        SELECT f."masterId" AS master_id, f."saleId" AS sale_id, sum(f.amount) AS fee
+          FROM sale_master_fee f
+          JOIN sale s ON s.id = f."saleId"
+          LEFT JOIN "user" u ON u.id = f."masterId"
+         WHERE ${whereSql}
+         GROUP BY f."masterId", f."saleId"
+      )`;
+
+    const [totals] = await this.saleRepository.query(
+      `${base}
+       SELECT count(DISTINCT p.master_id) AS masters, count(DISTINCT p.sale_id) AS sales, coalesce(sum(p.fee), 0) AS amount
+         FROM per_sale p`,
+      params,
+    );
+    const rows: Record<string, unknown>[] = await this.saleRepository.query(
+      `${base}
+       SELECT u.id AS master_id, u.username, u.surname, u.phone,
+              count(*) AS sales, sum(p.fee) AS amount, sum(s.total - s.discount) AS sales_total
+         FROM per_sale p
+         JOIN sale s ON s.id = p.sale_id
+         LEFT JOIN "user" u ON u.id = p.master_id
+        GROUP BY u.id, u.username, u.surname, u.phone
+        ORDER BY sum(p.fee) DESC, u.id
+        LIMIT ${safeLimit} OFFSET ${(safePage - 1) * safeLimit}`,
+      params,
+    );
+
+    const count = Number(totals.masters);
+    return {
+      meta: { total: count, page: safePage, limit: safeLimit, totalPages: Math.ceil(count / safeLimit) },
+      data: rows.map((row) => ({
+        masterId: row.master_id as number | null,
+        username: row.username as string | null,
+        surname: row.surname as string | null,
+        phone: row.phone as string | null,
+        sales: Number(row.sales),
+        salesTotal: Number(row.sales_total),
+        amount: Number(row.amount),
+      })),
+      totals: { masters: count, sales: Number(totals.sales), amount: Number(totals.amount) },
+    };
+  }
+
+  /**
+   * Bitta usta: davr ichida nechta savdoda qatnashgani, savdolar summasi, haqi — va har bir savdo
+   * (sana, kontragent, summa, haq, sotilgan mahsulotlar), sahifalab.
+   */
+  async masterFeeDetail(masterId: number, page = 1, limit = 10, start?: string, end?: string) {
+    const safePage = page > 0 ? page : 1;
+    const safeLimit = limit > 0 ? Math.min(limit, 100) : 10;
+
+    const master = await this.saleRepository.manager.findOne(User, {
+      where: { id: masterId },
+      select: { id: true, username: true, surname: true, phone: true },
+    });
+    if (!master) throw new NotFoundException('Мастер не найден');
+
+    const { where, params } = this.feeRange(start, end);
+    params.push(masterId);
+    const whereSql = `${where} AND f."masterId" = $${params.length}`;
+
+    const perSale = `
+      SELECT s.id AS sale_id, s.date, s.total, s.discount, sum(f.amount) AS fee,
+             string_agg(DISTINCT f.note, '; ') FILTER (WHERE f.note IS NOT NULL) AS note
+        FROM sale_master_fee f JOIN sale s ON s.id = f."saleId"
+       WHERE ${whereSql}
+       GROUP BY s.id, s.date, s.total, s.discount`;
+
+    const [totals] = await this.saleRepository.query(
+      `SELECT count(*) AS sales, coalesce(sum(t.fee), 0) AS amount, coalesce(sum(t.total - t.discount), 0) AS sales_total
+         FROM (${perSale}) t`,
+      params,
+    );
+    const sales: Record<string, unknown>[] = await this.saleRepository.query(
+      `SELECT t.*, c.id AS customer_id, c.username AS customer_username, c.surname AS customer_surname, c."orgName" AS customer_org
+         FROM (${perSale}) t
+         JOIN sale s ON s.id = t.sale_id
+         LEFT JOIN customer c ON c.id = s."customerId"
+        ORDER BY t.date DESC, t.sale_id DESC
+        LIMIT ${safeLimit} OFFSET ${(safePage - 1) * safeLimit}`,
+      params,
+    );
+
+    const ids = sales.map((row) => row.sale_id as number);
+    const items: { sale_id: number; name: string | null; quantity: string; price: number }[] = ids.length
+      ? await this.saleRepository.query(
+          `SELECT si."saleId" AS sale_id, p.name, si.quantity, si.price
+             FROM sale_item si LEFT JOIN product p ON p.id = si."productId"
+            WHERE si."saleId" = ANY($1::int[]) ORDER BY si.id`,
+          [ids],
+        )
+      : [];
+
+    const total = Number(totals.sales);
+    return {
+      master,
+      totals: { sales: total, salesTotal: Number(totals.sales_total), amount: Number(totals.amount) },
+      meta: { total, page: safePage, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) },
+      data: sales.map((row) => ({
+        saleId: row.sale_id as number,
+        date: row.date,
+        saleTotal: Number(row.total) - Number(row.discount),
+        amount: Number(row.fee),
+        note: (row.note as string | null) ?? null,
+        customer: row.customer_id
+          ? {
+              id: row.customer_id,
+              name: (row.customer_org as string | null)
+                || `${row.customer_username ?? ''} ${row.customer_surname ?? ''}`.trim(),
+            }
+          : null,
+        items: items
+          .filter((item) => item.sale_id === row.sale_id)
+          .map((item) => ({ name: item.name, quantity: Number(item.quantity), price: Number(item.price) })),
+      })),
+    };
+  }
+
+  /** Usta xizmatlari ro'yxati (qaysi savdoda, kimga, qancha) — sahifalab. `master_id` bilan bitta usta. */
+  async masterFeesList(page: number, limit: number, masterId?: number, start?: string, end?: string) {
+    const safePage = page > 0 ? page : 1;
+    const safeLimit = limit > 0 ? Math.min(limit, 100) : 10;
+    const { where, params } = this.feeRange(start, end);
+    const conditions = [where];
+    if (masterId) {
+      params.push(masterId);
+      conditions.push(`f."masterId" = $${params.length}`);
+    }
+    const whereSql = conditions.join(' AND ');
+
+    const [{ total }] = await this.saleRepository.query(
+      `SELECT count(*) AS total FROM sale_master_fee f JOIN sale s ON s.id = f."saleId" WHERE ${whereSql}`,
+      params,
+    );
+    const rows: Record<string, unknown>[] = await this.saleRepository.query(
+      `SELECT f.id, f.amount, f.note, s.id AS sale_id, s.date AS sale_date,
+              u.id AS master_id, u.username AS master_username, u.surname AS master_surname,
+              c.id AS customer_id, c.username AS customer_username, c.surname AS customer_surname, c."orgName" AS customer_org
+         FROM sale_master_fee f
+         JOIN sale s ON s.id = f."saleId"
+         LEFT JOIN "user" u ON u.id = f."masterId"
+         LEFT JOIN customer c ON c.id = s."customerId"
+        WHERE ${whereSql}
+        ORDER BY f.id DESC
+        LIMIT ${safeLimit} OFFSET ${(safePage - 1) * safeLimit}`,
+      params,
+    );
+
+    return {
+      meta: { total: Number(total), page: safePage, limit: safeLimit, totalPages: Math.ceil(Number(total) / safeLimit) },
+      data: rows.map((row) => ({
+        id: row.id,
+        amount: Number(row.amount),
+        note: row.note,
+        saleId: row.sale_id,
+        saleDate: row.sale_date,
+        master: row.master_id
+          ? { id: row.master_id, username: row.master_username, surname: row.master_surname }
+          : null,
+        customer: row.customer_id
+          ? { id: row.customer_id, name: row.customer_org || `${row.customer_username ?? ''} ${row.customer_surname ?? ''}`.trim() }
+          : null,
+      })),
+    };
+  }
+
+  private feeRange(start?: string, end?: string) {
+    const params: unknown[] = [];
+    const parts = ['true'];
+    const date = /^\d{4}-\d{2}-\d{2}$/;
+    if (start && date.test(start)) {
+      params.push(start);
+      parts.push(`s.date >= $${params.length}::date`);
+    }
+    if (end && date.test(end)) {
+      params.push(end);
+      parts.push(`s.date < ($${params.length}::date + interval '1 day')`);
+    }
+    return { where: parts.join(' AND '), params };
   }
 
   /**

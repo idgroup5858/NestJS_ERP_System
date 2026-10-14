@@ -364,6 +364,37 @@ export class StatsService implements OnModuleInit {
     };
   }
 
+  /**
+   * Usta xizmatlari (savdo sanasi bo'yicha): jami haq, nechta savdoda, nechta usta va eng ko'p haq olgan ustalar.
+   * Bu summalar `summary` dagi daromad va foydaga KIRMAYDI — ustaga beriladigan pul.
+   */
+  private async masterFeeStats(from: string, to: string) {
+    const [row]: Record<string, unknown>[] = await this.dataSource.query(
+      `SELECT coalesce(sum(f.amount), 0) AS total, count(DISTINCT f."saleId") AS sales, count(DISTINCT f."masterId") AS masters
+         FROM sale_master_fee f JOIN sale s ON s.id = f."saleId" WHERE ${inRange('s.date')}`,
+      [this.timezone, from, to],
+    );
+    const top: Record<string, unknown>[] = await this.dataSource.query(
+      `SELECT u.id, u.username, u.surname, count(DISTINCT f."saleId") AS sales, sum(f.amount) AS amount
+         FROM sale_master_fee f JOIN sale s ON s.id = f."saleId" LEFT JOIN "user" u ON u.id = f."masterId"
+        WHERE ${inRange('s.date')}
+        GROUP BY u.id, u.username, u.surname
+        ORDER BY sum(f.amount) DESC LIMIT 5`,
+      [this.timezone, from, to],
+    );
+    return {
+      total: money(row.total),
+      salesCount: num(row.sales),
+      mastersCount: num(row.masters),
+      top: top.map((item) => ({
+        id: item.id as number | null,
+        name: `${item.username ?? ''} ${item.surname ?? ''}`.trim() || '—',
+        salesCount: num(item.sales),
+        amount: money(item.amount),
+      })),
+    };
+  }
+
   /** Tanlangan davr: jami, oldingi teng davr bilan solishtirish, dinamika va kesimlar. */
   async dashboard(fromRaw?: string, toRaw?: string, granularityRaw?: string) {
     const { from, to, days } = this.parseRange(fromRaw, toRaw);
@@ -378,12 +409,13 @@ export class StatsService implements OnModuleInit {
 
     const previousRange = { from: shiftDate(from, -days), to: shiftDate(from, -1) };
 
-    const [current, previous, series, breakdowns, debt] = await Promise.all([
+    const [current, previous, series, breakdowns, debt, masterFees] = await Promise.all([
       this.summary(from, to),
       this.summary(previousRange.from, previousRange.to),
       this.series(from, to, granularity),
       this.breakdowns(from, to),
       this.debt(),
+      this.masterFeeStats(from, to),
     ]);
 
     return {
@@ -393,6 +425,8 @@ export class StatsService implements OnModuleInit {
       summary: current,
       previous,
       debt,
+      // Usta xizmatlari: do'konniki emas, daromad va foydaga kirmaydi — alohida ko'rsatiladi.
+      masterFees,
       series,
       ...breakdowns,
     };

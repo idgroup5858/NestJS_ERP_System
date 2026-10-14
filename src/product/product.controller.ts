@@ -80,8 +80,15 @@ export class ProductController {
     return this.productService.updatewithImage(+id, updateProductDto, file);
   }
 
+  /** Mahsulot qayerlarda ishlatilgani: o'chirishdan oldin tasdiq so'rash uchun. */
+  @Get('usage/:id')
+  usage(@Param('id') id: string) {
+    return this.productService.usage(+id);
+  }
+
+  /** Ishlatilgan mahsulot `confirm=true` bo'lmasa o'chirilmaydi (409, ichida `usage`). */
   @Delete('delete/:id')
-  remove(@Param('id') id: string) {
-    return this.productService.remove(+id);
+  remove(@Param('id') id: string, @Query('confirm') confirm?: string) {
+    return this.productService.remove(+id, confirm === 'true' || confirm === '1');
   }
 }
