@@ -1,14 +1,16 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateSaleDto, SaleMasterFeeDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { ChangeSaleCustomerDto } from './dto/change-sale-customer.dto';
+import { AddSaleMasterFeeDto } from './dto/add-sale-master-fee.dto';
+import { SaleListFilter } from './dto/sale-list-query.dto';
 import { Sale } from './entities/sale.entity';
 import { SaleMasterFee } from './entities/sale-master-fee.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Between, Brackets, Repository } from 'typeorm';
 import { SaleItemsService } from 'src/sale_items/sale_items.service';
 import { PaymentService } from 'src/payment/payment.service';
-import { CONTRACT_METHOD } from 'src/payment/payment-methods';
+import { CONTRACT_METHOD, OFFSET_METHOD } from 'src/payment/payment-methods';
 import { ContractService } from 'src/contract/contract.service';
 import { StockService } from 'src/stock/stock.service';
 import { TelegramBotService } from 'src/telegram/telegram-bot.service';
@@ -24,6 +26,9 @@ const MAX_SALE_DISCOUNT_PERCENT = 20;
 
 /** Bir savdodagi usta xizmatlari soni chegarasi. */
 const MAX_MASTER_FEES = 20;
+
+/** Kassadagi "В долг": to'lov yozilmaydi, summa savdo qarziga qo'shiladi. */
+const DEBT_METHOD = 'В долг';
 
 @Injectable()
 export class SaleService {
@@ -47,7 +52,8 @@ export class SaleService {
     const byContract = createSaleDto.open_contract
       ?? (createSaleDto.payments ?? []).some((payment) => payment.method === CONTRACT_METHOD);
 
-    // Usta xizmati haqi: savdo summasiga kirmaydi (alohida hisoblanadi) — oldindan tekshiriladi.
+    // Usta xizmati — oldindan tekshiriladi. Ustaning ulushi savdo summasiga kirmaydi (alohida hisoblanadi),
+    // kompaniya ulushi esa tovarlar bilan birga savdo summasiga qo'shiladi.
     const masterFees = await this.normalizeMasterFees(createSaleDto.master_fees);
 
     let total:number = 0;
@@ -55,11 +61,20 @@ export class SaleService {
     for (const item of createSaleDto.items) {
       total += item.quantity * item.price;
     }
-    total = roundMoney(total);
+    total = roundMoney(total + masterFees.reduce((sum, fee) => sum + fee.companyAmount, 0));
 
     const discount = Math.round(Number(createSaleDto.discount) || 0);
     if (discount < 0 || discount > Math.floor(total * MAX_SALE_DISCOUNT_PERCENT / 100)) {
       throw new BadRequestException(`Скидка не может превышать ${MAX_SALE_DISCOUNT_PERCENT}% суммы продажи`);
+    }
+
+    // To'lov savdo summasidan oshmasligi kerak. Kassa va server summani har xil hisoblasa (masalan, server eski
+    // versiyada qolib, usta xizmatidan kompaniya ulushini bilmasa) — savdo noto'g'ri yozilmasdan rad etiladi.
+    const paid = (createSaleDto.payments ?? []).reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+    if (paid > total - discount) {
+      throw new BadRequestException(
+        `Оплата (${paid.toLocaleString('ru-RU')}) больше суммы продажи (${(total - discount).toLocaleString('ru-RU')}) — обновите страницу и оформите продажу заново`,
+      );
     }
 
     // Sotuv tranzaksiyasiz yoziladi, shuning uchun qoldiq keyinroq topilmasa
@@ -81,6 +96,7 @@ export class SaleService {
           sale: { id: sale.id } as Sale,
           master: { id: fee.masterId } as User,
           amount: fee.amount,
+          companyAmount: fee.companyAmount,
           note: fee.note,
         })),
       );
@@ -269,27 +285,59 @@ export class SaleService {
 
 
 
-async findAllPagSearch(page: number, limit: number, search?: string) {
+/**
+ * Savdolar ro'yxati: qidiruv va filtrlar bilan (`SaleListFilter` ga qarang), sahifalab, yangilari tepada.
+ * Har bir savdoda usta xizmatlari (usta nomi va summalar) ham bor — ro'yxatda kim xizmat ko'rsatgani ko'rinadi.
+ * Xodimlarning parol xeshi chiqmaydi (faqat kerakli maydonlar tanlanadi).
+ */
+async findAllPagSearch(page: number, limit: number, filter: SaleListFilter = {}) {
   page = page > 0 ? page : 1;
-  limit = limit > 0 ? limit : 10;
+  limit = limit > 0 ? Math.min(limit, 100) : 10;
 
   const skip = (page - 1) * limit;
 
   const query = this.saleRepository.createQueryBuilder('sale')
   .leftJoinAndSelect('sale.items', 'items')
   .leftJoinAndSelect('sale.payments', 'payments')
-  .leftJoinAndSelect('sale.user', 'user')
+  .leftJoin('sale.user', 'seller')
+  .addSelect(['seller.id', 'seller.username', 'seller.surname', 'seller.email', 'seller.phone', 'seller.role'])
   .leftJoinAndSelect('items.warehouse', 'warehouse')
   .leftJoinAndSelect('items.product', 'product')
-  .leftJoinAndSelect('sale.customer', 'customer');
+  .leftJoinAndSelect('sale.customer', 'customer')
+  .leftJoin('sale.masterFees', 'fee')
+  .addSelect(['fee.id', 'fee.amount', 'fee.companyAmount'])
+  .leftJoin('fee.master', 'master')
+  .addSelect(['master.id', 'master.username', 'master.surname']);
 
-  // 🔍 Search qo‘shish
-  if (search) {
-    query.where(
-      'user.username ILIKE :search OR customer.username ILIKE :search',
-      { search: `%${search}%`}
+  // Qidiruv: kontragent (ism, tashkilot, telefon), sotgan xodim, usta yoki savdo raqami.
+  const term = filter.search?.trim();
+  if (term) {
+    query.andWhere(new Brackets((qb) => {
+      qb.where(`concat_ws(' ', customer.username, customer.surname) ILIKE :search`)
+        .orWhere('customer.orgName ILIKE :search')
+        .orWhere('customer.phone ILIKE :search')
+        .orWhere(`concat_ws(' ', seller.username, seller.surname) ILIKE :search`)
+        .orWhere(
+          `EXISTS (SELECT 1 FROM sale_master_fee sf JOIN "user" su ON su.id = sf."masterId"
+                    WHERE sf."saleId" = sale.id AND concat_ws(' ', su.username, su.surname) ILIKE :search)`,
+        );
+      const number = /^#?(\d{1,9})$/.exec(term);
+      if (number) qb.orWhere('sale.id = :saleNumber', { saleNumber: Number(number[1]) });
+    }), { search: `%${term}%` });
+  }
+  if (filter.debt) {
+    query.andWhere(
+      `sale.total - sale.discount > coalesce((SELECT sum(pd.amount) FROM payment pd WHERE pd."saleId" = sale.id), 0)`,
     );
   }
+  if (filter.masterId) {
+    query.andWhere(
+      `EXISTS (SELECT 1 FROM sale_master_fee mf WHERE mf."saleId" = sale.id AND mf."masterId" = :masterId)`,
+      { masterId: filter.masterId },
+    );
+  }
+  if (filter.userId) query.andWhere('seller.id = :sellerId', { sellerId: filter.userId });
+  if (filter.customerId) query.andWhere('customer.id = :customerId', { customerId: filter.customerId });
 
   const [data, total] = await query
     .orderBy('sale.id', 'DESC')
@@ -341,55 +389,77 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
       returnedTotal: returns.reduce((sum, r) => sum + r.total - r.discount, 0),
       // Savdoga bog'langan shartnoma (bo'lmasa `null`): ekranda ko'rsatiladi, "По договору" ga o'tkazish uchun kerak.
       contract: await this.contractService.briefBySale(id),
-      // Usta xizmati (savdo summasiga kirmaydi): ustaga beriladigan haqlar.
+      // Usta xizmati: ustaga beriladigan haqlar (savdo summasiga kirmaydi) va kompaniya ulushi (`sale.total` ichida).
       ...(await this.masterFeesOf(id)),
     };
   }
 
-  /** Usta xizmati qatorlarini tekshiradi: usta mavjud, summa butun va musbat. */
+  /**
+   * Usta xizmati qatorlarini tekshiradi: usta mavjud; ustaning ulushi va kompaniya ulushi — butun, manfiy emas,
+   * birgalikda noldan katta (butun xizmat kompaniyaga qolishi ham mumkin).
+   */
   private async normalizeMasterFees(fees?: SaleMasterFeeDto[]) {
     if (!fees || fees.length === 0) return [];
     if (!Array.isArray(fees) || fees.length > MAX_MASTER_FEES) {
       throw new BadRequestException(`Услуг мастеров в одной продаже не больше ${MAX_MASTER_FEES}`);
     }
 
-    const result: { masterId: number; amount: number; note: string | null }[] = [];
+    const valid = (value: number) => Number.isInteger(value) && value >= 0 && value <= 1_000_000_000;
+    const result: { masterId: number; amount: number; companyAmount: number; note: string | null }[] = [];
     for (const fee of fees) {
       const masterId = Number(fee?.master_id);
       const amount = Number(fee?.amount);
+      const companyAmount = Number(fee?.company_amount ?? 0);
       if (!Number.isInteger(masterId) || masterId < 1) throw new BadRequestException('Выберите мастера для услуги');
-      if (!Number.isInteger(amount) || amount < 1 || amount > 1_000_000_000) {
+      if (!valid(amount) || !valid(companyAmount) || amount + companyAmount < 1) {
         throw new BadRequestException('Сумма услуги мастера должна быть целым числом больше нуля');
       }
       const master = await this.saleRepository.manager.findOneBy(User, { id: masterId });
       if (!master) throw new BadRequestException(`Мастер #${masterId} не найден`);
       const note = typeof fee.note === 'string' ? fee.note.trim().slice(0, 200) : '';
-      result.push({ masterId, amount, note: note || null });
+      result.push({ masterId, amount, companyAmount, note: note || null });
     }
     return result;
   }
 
-  /** Savdodagi usta xizmatlari va ularning yig'indisi (parol xeshi chiqmaydi). */
+  /**
+   * Savdodagi usta xizmatlari (parol xeshi chiqmaydi). `masterFeeTotal` — ustalarga (savdo summasidan tashqari),
+   * `masterFeeCompanyTotal` — kompaniya ulushi (`sale.total` ichida).
+   */
   private async masterFeesOf(saleId: number) {
-    const rows: { id: number; amount: number; note: string | null; master_id: number | null; username: string | null; surname: string | null }[] =
-      await this.saleRepository.query(
-        `SELECT f.id, f.amount, f.note, u.id AS master_id, u.username, u.surname
-           FROM sale_master_fee f LEFT JOIN "user" u ON u.id = f."masterId"
-          WHERE f."saleId" = $1 ORDER BY f.id`,
-        [saleId],
-      );
+    const rows: {
+      id: number; amount: number; company_amount: number; note: string | null; created_at: Date;
+      payment_method: string | null; master_id: number | null; username: string | null; surname: string | null;
+    }[] = await this.saleRepository.query(
+      `SELECT f.id, f.amount, f."companyAmount" AS company_amount, f.note, f."createdAt" AS created_at,
+              pm.method AS payment_method, u.id AS master_id, u.username, u.surname
+         FROM sale_master_fee f
+         LEFT JOIN "user" u ON u.id = f."masterId"
+         LEFT JOIN payment pm ON pm.id = f."paymentId"
+        WHERE f."saleId" = $1 ORDER BY f.id`,
+      [saleId],
+    );
     const masterFees = rows.map((row) => ({
       id: row.id,
       amount: Number(row.amount),
+      companyAmount: Number(row.company_amount),
       note: row.note,
+      createdAt: row.created_at,
+      // Savdodan keyin qo'shilganda kompaniya ulushi qanday to'langani (`null` — savdo bilan birga yoki qarzga).
+      paymentMethod: row.payment_method,
       master: row.master_id ? { id: row.master_id, username: row.username, surname: row.surname } : null,
     }));
-    return { masterFees, masterFeeTotal: masterFees.reduce((sum, fee) => sum + fee.amount, 0) };
+    return {
+      masterFees,
+      masterFeeTotal: masterFees.reduce((sum, fee) => sum + fee.amount, 0),
+      masterFeeCompanyTotal: masterFees.reduce((sum, fee) => sum + fee.companyAmount, 0),
+    };
   }
 
   /**
    * Ustalar ro'yxati (sahifalab, qidiruv bilan): har bir usta nechta savdoda qatnashgani, shu savdolarning
-   * jami summasi (chegirmadan keyin) va jami haqi. `start`/`end` (YYYY-MM-DD) — savdo sanasi bo'yicha oraliq.
+   * jami summasi (chegirmadan keyin), jami haqi (`amount`) va uning xizmatlaridan kompaniya ulushi (`companyAmount`).
+   * `start`/`end` (YYYY-MM-DD) — savdo sanasi bo'yicha oraliq.
    * `totals` — qidiruv va oraliqqa mos hamma ustalar bo'yicha (sahifaga bog'liq emas).
    */
   async masterFeesSummary(page = 1, limit = 10, search?: string, start?: string, end?: string) {
@@ -410,7 +480,7 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
     // Bir savdoda bir usta bir necha qator olishi mumkin: avval (usta, savdo) bo'yicha jamlanadi, savdo summasi ikki marta sanalmaydi.
     const base = `
       WITH per_sale AS (
-        SELECT f."masterId" AS master_id, f."saleId" AS sale_id, sum(f.amount) AS fee
+        SELECT f."masterId" AS master_id, f."saleId" AS sale_id, sum(f.amount) AS fee, sum(f."companyAmount") AS company
           FROM sale_master_fee f
           JOIN sale s ON s.id = f."saleId"
           LEFT JOIN "user" u ON u.id = f."masterId"
@@ -420,14 +490,15 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
 
     const [totals] = await this.saleRepository.query(
       `${base}
-       SELECT count(DISTINCT p.master_id) AS masters, count(DISTINCT p.sale_id) AS sales, coalesce(sum(p.fee), 0) AS amount
+       SELECT count(DISTINCT p.master_id) AS masters, count(DISTINCT p.sale_id) AS sales,
+              coalesce(sum(p.fee), 0) AS amount, coalesce(sum(p.company), 0) AS company
          FROM per_sale p`,
       params,
     );
     const rows: Record<string, unknown>[] = await this.saleRepository.query(
       `${base}
        SELECT u.id AS master_id, u.username, u.surname, u.phone,
-              count(*) AS sales, sum(p.fee) AS amount, sum(s.total - s.discount) AS sales_total
+              count(*) AS sales, sum(p.fee) AS amount, sum(p.company) AS company, sum(s.total - s.discount) AS sales_total
          FROM per_sale p
          JOIN sale s ON s.id = p.sale_id
          LEFT JOIN "user" u ON u.id = p.master_id
@@ -448,8 +519,14 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
         sales: Number(row.sales),
         salesTotal: Number(row.sales_total),
         amount: Number(row.amount),
+        companyAmount: Number(row.company),
       })),
-      totals: { masters: count, sales: Number(totals.sales), amount: Number(totals.amount) },
+      totals: {
+        masters: count,
+        sales: Number(totals.sales),
+        amount: Number(totals.amount),
+        companyAmount: Number(totals.company),
+      },
     };
   }
 
@@ -472,14 +549,15 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
     const whereSql = `${where} AND f."masterId" = $${params.length}`;
 
     const perSale = `
-      SELECT s.id AS sale_id, s.date, s.total, s.discount, sum(f.amount) AS fee,
+      SELECT s.id AS sale_id, s.date, s.total, s.discount, sum(f.amount) AS fee, sum(f."companyAmount") AS company,
              string_agg(DISTINCT f.note, '; ') FILTER (WHERE f.note IS NOT NULL) AS note
         FROM sale_master_fee f JOIN sale s ON s.id = f."saleId"
        WHERE ${whereSql}
        GROUP BY s.id, s.date, s.total, s.discount`;
 
     const [totals] = await this.saleRepository.query(
-      `SELECT count(*) AS sales, coalesce(sum(t.fee), 0) AS amount, coalesce(sum(t.total - t.discount), 0) AS sales_total
+      `SELECT count(*) AS sales, coalesce(sum(t.fee), 0) AS amount, coalesce(sum(t.company), 0) AS company,
+              coalesce(sum(t.total - t.discount), 0) AS sales_total
          FROM (${perSale}) t`,
       params,
     );
@@ -506,13 +584,19 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
     const total = Number(totals.sales);
     return {
       master,
-      totals: { sales: total, salesTotal: Number(totals.sales_total), amount: Number(totals.amount) },
+      totals: {
+        sales: total,
+        salesTotal: Number(totals.sales_total),
+        amount: Number(totals.amount),
+        companyAmount: Number(totals.company),
+      },
       meta: { total, page: safePage, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) },
       data: sales.map((row) => ({
         saleId: row.sale_id as number,
         date: row.date,
         saleTotal: Number(row.total) - Number(row.discount),
         amount: Number(row.fee),
+        companyAmount: Number(row.company),
         note: (row.note as string | null) ?? null,
         customer: row.customer_id
           ? {
@@ -545,7 +629,7 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
       params,
     );
     const rows: Record<string, unknown>[] = await this.saleRepository.query(
-      `SELECT f.id, f.amount, f.note, s.id AS sale_id, s.date AS sale_date,
+      `SELECT f.id, f.amount, f."companyAmount" AS company_amount, f.note, s.id AS sale_id, s.date AS sale_date,
               u.id AS master_id, u.username AS master_username, u.surname AS master_surname,
               c.id AS customer_id, c.username AS customer_username, c.surname AS customer_surname, c."orgName" AS customer_org
          FROM sale_master_fee f
@@ -563,6 +647,7 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
       data: rows.map((row) => ({
         id: row.id,
         amount: Number(row.amount),
+        companyAmount: Number(row.company_amount),
         note: row.note,
         saleId: row.sale_id,
         saleDate: row.sale_date,
@@ -655,6 +740,99 @@ async findAllPagSearch(page: number, limit: number, search?: string) {
     });
 
     return this.findDetail(id);
+  }
+
+  /**
+   * Savdo qilingandan keyin usta xizmatini qo'shish (usta kech kelgan bo'lsa). Hisob kassadagidek: ustaning ulushi
+   * savdo summasiga kirmaydi, kompaniya ulushi `sale.total` ga qo'shiladi. Ulush shu zahoti to'langan bo'lsa
+   * (`method`), to'lov yoziladi va xizmatga bog'lanadi; "В долг" (yoki usul berilmasa) — savdo qarziga qo'shiladi.
+   * Savdoning shartnomasi bo'lsa, uning summasi ham yangilanadi (yopilgan shartnomada rad etiladi).
+   * Hammasi bitta tranzaksiyada. Yangilangan tafsilotni qaytaradi.
+   */
+  async addMasterFee(id: number, dto: AddSaleMasterFeeDto) {
+    const [fee] = await this.normalizeMasterFees([
+      { master_id: dto.master_id, amount: dto.amount, company_amount: dto.company_amount, note: dto.note },
+    ]);
+    const method = dto.method?.trim() || DEBT_METHOD;
+    if (method === CONTRACT_METHOD || method === OFFSET_METHOD) {
+      throw new BadRequestException('Этот способ оплаты нельзя выбрать для услуги мастера');
+    }
+
+    let feeId = 0;
+    let actor: User | null = null;
+    await this.saleRepository.manager.transaction(async (em) => {
+      if (!(await em.exists(Sale, { where: { id } }))) throw new NotFoundException('Продажа не найдена');
+      actor = await em.findOneBy(User, { id: dto.user_id });
+      if (!actor) throw new NotFoundException(`Пользователь #${dto.user_id} не найден`);
+      if ((await em.count(SaleMasterFee, { where: { sale: { id } } })) >= MAX_MASTER_FEES) {
+        throw new BadRequestException(`Услуг мастеров в одной продаже не больше ${MAX_MASTER_FEES}`);
+      }
+
+      let payment: Payment | null = null;
+      if (fee.companyAmount > 0) {
+        await em.increment(Sale, { id }, 'total', fee.companyAmount);
+        await this.contractService.followSaleTotal(em, id, actor, `добавлена услуга мастера: +${fee.companyAmount.toLocaleString('ru-RU')}`);
+        if (method !== DEBT_METHOD) {
+          payment = await em.save(em.create(Payment, { sale: { id } as Sale, amount: fee.companyAmount, method }));
+        }
+      }
+
+      const saved = await em.save(em.create(SaleMasterFee, {
+        sale: { id } as Sale,
+        master: { id: fee.masterId } as User,
+        amount: fee.amount,
+        companyAmount: fee.companyAmount,
+        note: fee.note,
+        payment,
+      }));
+      feeId = saved.id;
+    });
+
+    // Telegram ga (javobni kutmasdan): savdo summasi va kassa o'zgargan bo'lishi mumkin.
+    this.telegramBot.notifyMasterFee(feeId, actor);
+    return this.findDetail(id);
+  }
+
+  /**
+   * Usta xizmatini o'chirish (faqat admin; adashib qo'shilgan bo'lsa). Kompaniya ulushi savdo summasidan ayiriladi;
+   * ulush savdodan keyin alohida to'langan bo'lsa, o'sha to'lov ham o'chadi. Ulush savdo bilan birga to'langan
+   * bo'lsa va o'chirilsa to'lov savdo summasidan oshib ketsa — rad etiladi (pulni qaytarishning boshqa yo'li yo'q).
+   */
+  async removeMasterFee(feeId: number, userId: number) {
+    let saleId = 0;
+    await this.saleRepository.manager.transaction(async (em) => {
+      const actor = userId ? await em.findOneBy(User, { id: userId }) : null;
+      if (actor?.role?.trim().toLowerCase() !== 'admin') {
+        throw new ForbiddenException('Удалять услугу мастера может только администратор');
+      }
+
+      const fee = await em.findOne(SaleMasterFee, { where: { id: feeId }, relations: { sale: true, payment: true } });
+      if (!fee) throw new NotFoundException('Услуга мастера не найдена');
+      saleId = fee.sale.id;
+
+      if (fee.companyAmount > 0) {
+        const sale = await em.findOne(Sale, { where: { id: saleId }, relations: { payments: true, returns: true } });
+        if (!sale) throw new NotFoundException('Продажа не найдена');
+        const net = sale.total - fee.companyAmount - sale.discount;
+        const paid = sale.payments
+          .filter((payment) => payment.id !== fee.payment?.id)
+          .reduce((sum, payment) => sum + payment.amount, 0);
+        const returned = sale.returns.reduce((sum, item) => sum + item.total - item.discount, 0);
+        if (paid > net || returned > net) {
+          throw new BadRequestException(
+            'Доля компании уже оплачена вместе с продажей — после удаления оплата станет больше суммы продажи. Удалить нельзя',
+          );
+        }
+
+        if (fee.payment) await em.delete(Payment, { id: fee.payment.id });
+        await em.decrement(Sale, { id: saleId }, 'total', fee.companyAmount);
+        await this.contractService.followSaleTotal(em, saleId, actor, `удалена услуга мастера: −${fee.companyAmount.toLocaleString('ru-RU')}`);
+      }
+
+      await em.delete(SaleMasterFee, { id: feeId });
+    });
+
+    return this.findDetail(saleId);
   }
 
   // async update(id: number, updateSaleDto: UpdateSaleDto) {

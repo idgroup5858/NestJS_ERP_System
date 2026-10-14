@@ -371,7 +371,7 @@ export class ContractService {
     if (!saleId) return null;
     const sale = await this.sales.findOne({
       where: { id: saleId },
-      relations: { items: { product: true }, payments: true, user: true },
+      relations: { items: { product: true }, payments: true, user: true, masterFees: { master: true } },
     });
     if (!sale) return null;
 
@@ -395,6 +395,10 @@ export class ContractService {
         price: item.price,
         sum: Math.round(item.quantity * item.price),
       })),
+      // Usta xizmatidan kompaniya ulushi: `total` ichida (tovarlar bilan birga to'lanadi).
+      services: (sale.masterFees ?? [])
+        .filter((fee) => fee.companyAmount > 0)
+        .map((fee) => ({ id: fee.id, master: brief(fee.master), amount: fee.companyAmount })),
       payments: (sale.payments ?? []).map((payment) => ({
         id: payment.id,
         method: payment.method,
@@ -796,6 +800,34 @@ export class ContractService {
 
     await this.log(em, contract, actor, 'updated', {
       note: `Изменено: контрагент: ${name(before)} → ${name(customer)} (в продаже №${saleId})`,
+    });
+  }
+
+  /**
+   * Savdo summasi savdodan keyin o'zgarganda (usta xizmati qo'shilsa yoki o'chirilsa) bog'langan shartnoma summasi
+   * ham yangilanadi — savdodan ochilgan shartnomada summa savdodan olinadi. Savdo tranzaksiyasi ichida, savdo
+   * yangilangandan keyin chaqiriladi. Yopilgan shartnomada rad etiladi: avval admin uni qayta ochishi kerak.
+   * Shartnoma bo'lmasa — hech narsa qilmaydi.
+   */
+  async followSaleTotal(em: EntityManager, saleId: number, actor: User, reason: string) {
+    const contract = await em.findOne(Contract, { where: { sale: { id: saleId } } });
+    if (!contract) return;
+    if (contract.status === 'closed') {
+      throw new BadRequestException(
+        'Договор по этой продаже закрыт — сначала администратор должен открыть его заново, затем можно менять сумму продажи',
+      );
+    }
+
+    const sale = await em.findOneBy(Sale, { id: saleId });
+    if (!sale) return;
+    const amount = Math.max(0, sale.total - sale.discount);
+    if (amount === contract.amount) return;
+
+    const before = contract.amount;
+    contract.amount = amount;
+    await em.save(contract);
+    await this.log(em, contract, actor, 'updated', {
+      note: `Изменено: сумма ${before.toLocaleString('ru-RU')} → ${amount.toLocaleString('ru-RU')} (${reason})`,
     });
   }
 

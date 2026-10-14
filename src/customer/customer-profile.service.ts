@@ -211,6 +211,16 @@ export class CustomerProfileService {
     const items = new Map<string, Row[]>();
     const payments = new Map<string, Row[]>();
 
+    // Savdolardagi usta xizmatlari: usta, uning ulushi (savdo summasidan tashqari) va kompaniya ulushi (summa ichida).
+    const saleIds = rows.filter((row) => row.type === 'sale').map((row) => row.id as number);
+    const feeRows: Row[] = saleIds.length
+      ? await this.dataSource.query(
+          `SELECT f."saleId" AS op_id, f.amount, f."companyAmount" AS company_amount,
+                  u.id AS master_id, u.username, u.surname
+           FROM sale_master_fee f LEFT JOIN "user" u ON u.id = f."masterId"
+           WHERE f."saleId" = ANY($1::int[]) ORDER BY f.id`, [saleIds])
+      : [];
+
     await Promise.all(
       wanted.map(async (key) => {
         const ids = rows.filter((row) => row.type === key).map((row) => row.id as number);
@@ -271,6 +281,17 @@ export class CustomerProfileService {
             amount: money(payment.amount),
             date: payment.date,
           })),
+          masterFees: row.type === 'sale'
+            ? feeRows
+                .filter((fee) => fee.op_id === row.id)
+                .map((fee) => ({
+                  master: fee.master_id
+                    ? { id: fee.master_id as number, username: fee.username as string, surname: fee.surname as string }
+                    : null,
+                  amount: money(fee.amount),
+                  companyAmount: money(fee.company_amount),
+                }))
+            : [],
         };
       }),
     };

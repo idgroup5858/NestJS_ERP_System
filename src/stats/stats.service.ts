@@ -366,11 +366,13 @@ export class StatsService implements OnModuleInit {
 
   /**
    * Usta xizmatlari (savdo sanasi bo'yicha): jami haq, nechta savdoda, nechta usta va eng ko'p haq olgan ustalar.
-   * Bu summalar `summary` dagi daromad va foydaga KIRMAYDI — ustaga beriladigan pul.
+   * `total` (ustalarga) `summary` dagi daromad va foydaga KIRMAYDI — ustaga beriladigan pul.
+   * `companyTotal` — xizmatlardan kompaniya ulushi: u `sale.total` ichida, ya'ni daromad va foydaga allaqachon kirgan.
    */
   private async masterFeeStats(from: string, to: string) {
     const [row]: Record<string, unknown>[] = await this.dataSource.query(
-      `SELECT coalesce(sum(f.amount), 0) AS total, count(DISTINCT f."saleId") AS sales, count(DISTINCT f."masterId") AS masters
+      `SELECT coalesce(sum(f.amount), 0) AS total, coalesce(sum(f."companyAmount"), 0) AS company,
+              count(DISTINCT f."saleId") AS sales, count(DISTINCT f."masterId") AS masters
          FROM sale_master_fee f JOIN sale s ON s.id = f."saleId" WHERE ${inRange('s.date')}`,
       [this.timezone, from, to],
     );
@@ -384,6 +386,7 @@ export class StatsService implements OnModuleInit {
     );
     return {
       total: money(row.total),
+      companyTotal: money(row.company),
       salesCount: num(row.sales),
       mastersCount: num(row.masters),
       top: top.map((item) => ({

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const s=require\\('C:/Users/iD_GROUP/.claude/settings.json'\\);console.log\\(s.permissions.allow.slice\\(-8\\)\\)\")",
+      "Bash(node -e \"const s=JSON.parse\\(require\\('fs'\\).readFileSync\\('C:/Users/iD_GROUP/.claude/settings.json','utf8'\\)\\);console.log\\(s.permissions.allow.length\\)\")"
+    ]
+  }
+}

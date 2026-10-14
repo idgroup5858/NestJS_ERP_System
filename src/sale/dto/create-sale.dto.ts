@@ -3,7 +3,10 @@ import { CreateSaleItemDto } from "src/sale_items/dto/create-sale_item.dto";
 
 export class SaleMasterFeeDto {
      master_id: number;
+     /** Ustaning ulushi: savdo summasiga kirmaydi. */
      amount: number;
+     /** Kompaniya ulushi: savdo summasiga qo'shiladi (berilmasa 0). */
+     company_amount?: number;
      note?: string;
 }
 
@@ -23,7 +26,10 @@ export class CreateSaleDto {
       */
      open_contract?: boolean;
 
-     /** Usta xizmati: savdo summasiga kirmaydi, ustaga beriladi va alohida hisoblanadi. */
+     /**
+      * Usta xizmati: ustaning ulushi (`amount`) savdo summasiga kirmaydi, ustaga beriladi va alohida hisoblanadi;
+      * kompaniya ulushi (`company_amount`) savdo summasiga qo'shiladi.
+      */
      master_fees?: SaleMasterFeeDto[];
 
 

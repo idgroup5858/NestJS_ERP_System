@@ -3,6 +3,7 @@ import { SaleService } from './sale.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { ChangeSaleCustomerDto } from './dto/change-sale-customer.dto';
+import { AddSaleMasterFeeDto } from './dto/add-sale-master-fee.dto';
 
 @Controller('sale')
 export class SaleController {
@@ -27,13 +28,28 @@ export class SaleController {
       return this.saleService.findAllPag(+page, +limit);
   }
 
+  /**
+   * Savdolar ro'yxati. `search` — kontragent, sotgan xodim, usta yoki savdo raqami; `debt=true` — faqat qarzi borlar;
+   * `master_id`, `user_id` (sotgan xodim), `customer_id` — filtrlar.
+   */
   @Get("allpagsearch")
   findAllPagSearch(
     @Query("page") page:string,
     @Query("limit") limit:string,
-    @Query("search") search:string
+    @Query("search") search?:string,
+    @Query("debt") debt?:string,
+    @Query("master_id") masterId?:string,
+    @Query("user_id") userId?:string,
+    @Query("customer_id") customerId?:string,
   ) {
-    return this.saleService.findAllPagSearch(+page,+limit,search);
+    const id = (value?: string) => (Number.isInteger(Number(value)) && Number(value) > 0 ? Number(value) : undefined);
+    return this.saleService.findAllPagSearch(+page, +limit, {
+      search,
+      debt: debt === 'true' || debt === '1',
+      masterId: id(masterId),
+      userId: id(userId),
+      customerId: id(customerId),
+    });
   }
 
   @Get("allrange")
@@ -118,6 +134,18 @@ export class SaleController {
   @Patch('customer/:id')
   changeCustomer(@Param('id') id: string, @Body() dto: ChangeSaleCustomerDto) {
     return this.saleService.changeCustomer(+id, dto);
+  }
+
+  /** Savdodan keyin usta xizmatini qo'shish (usta kech kelgan bo'lsa); hisob kassadagidek. */
+  @Post('master-fee/:id')
+  addMasterFee(@Param('id') id: string, @Body() dto: AddSaleMasterFeeDto) {
+    return this.saleService.addMasterFee(+id, dto);
+  }
+
+  /** Usta xizmatini o'chirish — faqat admin (`user_id`). */
+  @Delete('master-fee/:feeId')
+  removeMasterFee(@Param('feeId') feeId: string, @Query('user_id') userId: string) {
+    return this.saleService.removeMasterFee(+feeId, +userId);
   }
 
   // @Patch('update/:id')

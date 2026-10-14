@@ -5,6 +5,7 @@ import { Between, DataSource, Repository } from 'typeorm';
 import { Telegram } from './entities/telegram.entity';
 import { TelegramChat } from './entities/telegram-chat.entity';
 import { Sale } from 'src/sale/entities/sale.entity';
+import { SaleMasterFee } from 'src/sale/entities/sale-master-fee.entity';
 import { Return } from 'src/return/entities/return.entity';
 import { OFFSET_METHOD } from 'src/payment/payment-methods';
 
@@ -313,10 +314,21 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
     void this.safely(async () => {
       const sale = await this.dataSource.manager.findOne(Sale, {
         where: { id: saleId },
-        relations: ['items', 'items.product', 'payments', 'customer', 'user'],
-        order: { items: { id: 'ASC' } },
+        relations: ['items', 'items.product', 'payments', 'customer', 'user', 'masterFees', 'masterFees.master'],
+        order: { items: { id: 'ASC' }, masterFees: { id: 'ASC' } },
       });
       if (sale) await this.broadcast(this.formatSale(sale));
+    });
+  }
+
+  /** Savdodan keyin qo'shilgan usta xizmati haqida xabar (savdo summasi va kassa o'zgargan bo'lishi mumkin). Kutilmaydi. */
+  notifyMasterFee(feeId: number, actor?: { username?: string, surname?: string } | null) {
+    void this.safely(async () => {
+      const fee = await this.dataSource.manager.findOne(SaleMasterFee, {
+        where: { id: feeId },
+        relations: ['sale', 'sale.customer', 'master', 'payment'],
+      });
+      if (fee) await this.broadcast(this.formatMasterFee(fee, actor));
     });
   }
 
@@ -401,6 +413,15 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
       ...this.formatItems(sale.items),
       '',
     ];
+    // Usta xizmati: kompaniya ulushi savdo summasida, ustaning ulushi — alohida (summaga kirmaydi).
+    for (const fee of sale.masterFees ?? []) {
+      const master = person(fee.master) ? ` (${esc(person(fee.master))})` : '';
+      const parts: string[] = [];
+      if (fee.companyAmount > 0) parts.push(`в сумме продажи <b>${money(fee.companyAmount)}</b>`);
+      if (fee.amount > 0) parts.push(`мастеру ${money(fee.amount)} отдельно`);
+      lines.push(`🔧 Услуга мастера${master}: ${parts.join(' · ')}`);
+    }
+    if (sale.masterFees?.length) lines.push('');
     if (sale.discount > 0) {
       lines.push(`Сумма: ${money(sale.total)}`, `Скидка: −${money(sale.discount)}`);
     }
@@ -409,6 +430,20 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
       if (p.amount > 0) lines.push(`${p.method === 'Наличные' ? '💵' : '💳'} ${esc(p.method)}: ${money(p.amount)}`);
     }
     if (net - paid > 0) lines.push(`⚠️ В долг: ${money(net - paid)}`);
+    return lines.join('\n');
+  }
+
+  private formatMasterFee(fee: SaleMasterFee, actor?: { username?: string, surname?: string } | null) {
+    const lines = [
+      ...this.header('🔧', `Услуга мастера · к продаже #${fee.sale.id}`, fee.createdAt, actor, fee.sale.customer),
+      '',
+      `Мастер: ${esc(person(fee.master) || '—')}`,
+    ];
+    if (fee.companyAmount > 0) {
+      const paid = fee.payment ? `оплачено (${esc(fee.payment.method)})` : 'в долг';
+      lines.push(`В сумме продажи: <b>${money(fee.companyAmount)}</b> — ${paid}`);
+    }
+    if (fee.amount > 0) lines.push(`Мастеру (отдельно): ${money(fee.amount)}`);
     return lines.join('\n');
   }
 
