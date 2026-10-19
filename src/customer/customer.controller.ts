@@ -42,9 +42,11 @@ export class CustomerController {
     @Query("limit") limit:string,
     @Query("search") search:string,
     // organization — faqat tashkilotlar, user — faqat odamlar; yuborilmasa hammasi.
-    @Query("type") type?: string
+    @Query("type") type?: string,
+    // true / 1 — faqat qarzi bor kontragentlar.
+    @Query("debt") debt?: string
   ) {
-    return this.customerService.findAllPagSearch(+page,+limit,search,type);
+    return this.customerService.findAllPagSearch(+page,+limit,search,type,debt === 'true' || debt === '1');
   }
 
   /** Kontragent kartochkasi: ma'lumot, savdo/qaytarish/xarid jamlanmasi, to'lov usullari, top tovarlar, 12 oy. */
@@ -56,7 +58,7 @@ export class CustomerController {
   /** Kontragent bilan barcha operatsiyalar (savdo, qaytarish, xarid): qatorlar va to'lovlar bilan, sahifalangan. */
   @Get('operations/:id')
   operations(@Param('id') id: string, @Query() query: CustomerOperationsQueryDto) {
-    return this.profileService.operations(+id, query.page ?? 1, query.limit ?? 10, query.type);
+    return this.profileService.operations(+id, query.page ?? 1, query.limit ?? 10, query.type, query.debt ?? false);
   }
 
   @Get('getby/:id')

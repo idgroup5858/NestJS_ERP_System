@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { OFFSET_METHOD } from 'src/payment/payment-methods';
 import { Customer } from './entities/customer.entity';
-import { OperationType } from './dto/customer-operations-query.dto';
+import { OPERATIONS_MAX_LIMIT, OperationType } from './dto/customer-operations-query.dto';
 
 type Row = Record<string, unknown>;
 
@@ -178,13 +178,18 @@ export class CustomerProfileService {
     };
   }
 
-  /** Savdo, qaytarish va xaridlar — bitta tarix (yangilari tepada), har birida qatorlar va to'lovlar bilan. */
-  async operations(id: number, page = 1, limit = 10, type?: OperationType) {
+  /**
+   * Savdo, qaytarish va xaridlar — bitta tarix (yangilari tepada), har birida qatorlar va to'lovlar bilan.
+   * `debt` — faqat qarzi qolgan savdolar. `totals` — filtrdagi barcha operatsiyalar (hamma sahifalar) bo'yicha jamlanma.
+   */
+  async operations(id: number, page = 1, limit = 10, type?: OperationType, debt = false) {
     await this.requireCustomer(id);
     page = page > 0 ? page : 1;
-    limit = limit > 0 ? Math.min(limit, 50) : 10;
+    limit = limit > 0 ? Math.min(limit, OPERATIONS_MAX_LIMIT) : 10;
 
-    const wanted = (['sale', 'return', 'purchase'] as const).filter((key) => !type || key === type);
+    const wanted = (['sale', 'return', 'purchase'] as const).filter((key) =>
+      debt ? key === 'sale' : !type || key === type,
+    );
     const union = wanted
       .map((key) => {
         const source = SOURCES[key];
@@ -196,12 +201,28 @@ export class CustomerProfileService {
           FROM ${source.table} x WHERE x."customerId" = $1`;
       })
       .join('\nUNION ALL\n');
+    // Qarz: summa (jami − chegirma) to'lovlardan katta — profil jamlanmasidagi qoida bilan bir xil.
+    const where = debt ? 'WHERE ops.total - ops.discount - ops.paid > 0' : '';
 
     const [counted, rows]: [Row[], Row[]] = await Promise.all([
-      this.dataSource.query(`SELECT count(*) AS total FROM (${union}) ops`, [id, OFFSET_METHOD]),
+      this.dataSource.query(
+        `SELECT count(*) AS total,
+                count(*) FILTER (WHERE ops.type = 'sale') AS sales_cnt,
+                coalesce(sum(ops.total - ops.discount) FILTER (WHERE ops.type = 'sale'), 0) AS sales,
+                coalesce(sum(ops.paid) FILTER (WHERE ops.type = 'sale'), 0) AS sales_paid,
+                count(*) FILTER (WHERE ops.type = 'sale' AND ops.total - ops.discount - ops.paid > 0) AS debt_cnt,
+                coalesce(sum(greatest(0, ops.total - ops.discount - ops.paid)) FILTER (WHERE ops.type = 'sale'), 0) AS debt,
+                count(*) FILTER (WHERE ops.type = 'return') AS returns_cnt,
+                coalesce(sum(ops.total - ops.discount) FILTER (WHERE ops.type = 'return'), 0) AS returns,
+                count(*) FILTER (WHERE ops.type = 'purchase') AS purchases_cnt,
+                coalesce(sum(ops.total - ops.discount) FILTER (WHERE ops.type = 'purchase'), 0) AS purchases
+         FROM (${union}) ops ${where}`,
+        [id, OFFSET_METHOD],
+      ),
       this.dataSource.query(
         `SELECT ops.*, u.username, u.surname
          FROM (${union}) ops LEFT JOIN "user" u ON u.id = ops.user_id
+         ${where}
          ORDER BY ops.date DESC, ops.id DESC LIMIT $3 OFFSET $4`,
         [id, OFFSET_METHOD, limit, (page - 1) * limit],
       ),
@@ -246,9 +267,21 @@ export class CustomerProfileService {
       }),
     );
 
-    const total = num(counted[0].total);
+    const c = counted[0];
+    const total = num(c.total);
     return {
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      totals: {
+        salesCount: num(c.sales_cnt),
+        sales: money(c.sales),
+        salesPaid: money(c.sales_paid),
+        debtCount: num(c.debt_cnt),
+        debt: money(c.debt),
+        returnsCount: num(c.returns_cnt),
+        returns: money(c.returns),
+        purchasesCount: num(c.purchases_cnt),
+        purchases: money(c.purchases),
+      },
       data: rows.map((row) => {
         const net = money(row.total) - money(row.discount);
         const paid = money(row.paid);

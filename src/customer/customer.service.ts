@@ -149,7 +149,12 @@ export class CustomerService {
     });
   }
 
-async findAllPagSearch(page: number, limit: number, search?: string, type?: string) {
+/**
+ * Kontragentlar ro'yxati: qidiruv, tur filtri va `debt` — faqat qarzi bor (to'lanmagan savdosi bor) kontragentlar.
+ * Har bir qatorda `debt` (savdo qarzi jami) va `debtSales` (qarzli savdolar soni) ham qaytadi — qoida profil
+ * jamlanmasi bilan bir xil: savdo summasi (jami − chegirma) to'lovlardan katta.
+ */
+async findAllPagSearch(page: number, limit: number, search?: string, type?: string, debt = false) {
   page = page > 0 ? page : 1;
   limit = limit > 0 ? limit : 10;
 
@@ -176,11 +181,36 @@ async findAllPagSearch(page: number, limit: number, search?: string, type?: stri
     query.andWhere("(customer.type IS NULL OR customer.type <> 'organization')");
   }
 
+  if (debt) {
+    query.andWhere(
+      `EXISTS (SELECT 1 FROM sale s WHERE s."customerId" = customer.id
+         AND s.total - s.discount - coalesce((SELECT sum(p.amount) FROM payment p WHERE p."saleId" = s.id), 0) > 0)`,
+    );
+  }
+
   const [data, total] = await query
     .orderBy('customer.id', 'DESC')
     .skip(skip)
     .take(limit)
     .getManyAndCount();
+
+  // Faqat shu sahifadagi kontragentlar qarzi — bitta so'rov bilan.
+  const debts = new Map<number, { debt: number; debtSales: number }>();
+  if (data.length > 0) {
+    const rows: { id: number; debt: string; debt_sales: string }[] = await this.customerRepository.query(
+      `SELECT s."customerId" AS id,
+              sum(greatest(0, s.total - s.discount - coalesce(p.paid, 0))) AS debt,
+              count(*) FILTER (WHERE s.total - s.discount - coalesce(p.paid, 0) > 0) AS debt_sales
+       FROM sale s
+       LEFT JOIN LATERAL (SELECT sum(amount) AS paid FROM payment WHERE "saleId" = s.id) p ON true
+       WHERE s."customerId" = ANY($1::int[])
+       GROUP BY s."customerId"`,
+      [data.map((customer) => customer.id)],
+    );
+    for (const row of rows) {
+      debts.set(Number(row.id), { debt: Math.round(Number(row.debt)), debtSales: Number(row.debt_sales) });
+    }
+  }
 
   return {
     meta: {
@@ -189,7 +219,7 @@ async findAllPagSearch(page: number, limit: number, search?: string, type?: stri
       limit,
       totalPages: Math.ceil(total / limit),
     },
-    data,
+    data: data.map((customer) => ({ ...customer, ...(debts.get(customer.id) ?? { debt: 0, debtSales: 0 }) })),
   };
 }
 

@@ -395,8 +395,9 @@ async findAllPagSearch(page: number, limit: number, filter: SaleListFilter = {})
   }
 
   /**
-   * Usta xizmati qatorlarini tekshiradi: usta mavjud; ustaning ulushi va kompaniya ulushi — butun, manfiy emas,
-   * birgalikda noldan katta (butun xizmat kompaniyaga qolishi ham mumkin).
+   * Usta xizmati qatorlarini tekshiradi: usta mavjud; ustaning ulushi va kompaniya ulushi — butun, manfiy emas
+   * (butun xizmat kompaniyaga qolishi ham mumkin). Ikkalasi 0 bo'lishi ham mumkin — kassir summani yozmagan:
+   * usta savdoga bog'lanadi, summalar 0 bo'lib qoladi.
    */
   private async normalizeMasterFees(fees?: SaleMasterFeeDto[]) {
     if (!fees || fees.length === 0) return [];
@@ -411,8 +412,8 @@ async findAllPagSearch(page: number, limit: number, filter: SaleListFilter = {})
       const amount = Number(fee?.amount);
       const companyAmount = Number(fee?.company_amount ?? 0);
       if (!Number.isInteger(masterId) || masterId < 1) throw new BadRequestException('Выберите мастера для услуги');
-      if (!valid(amount) || !valid(companyAmount) || amount + companyAmount < 1) {
-        throw new BadRequestException('Сумма услуги мастера должна быть целым числом больше нуля');
+      if (!valid(amount) || !valid(companyAmount)) {
+        throw new BadRequestException('Сумма услуги мастера должна быть целым неотрицательным числом');
       }
       const master = await this.saleRepository.manager.findOneBy(User, { id: masterId });
       if (!master) throw new BadRequestException(`Мастер #${masterId} не найден`);
