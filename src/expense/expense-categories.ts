@@ -1,6 +1,6 @@
 /**
- * Tayyor xarajat turlari (UI da ro'yxat bo'lib chiqadi). Ro'yxatda yo'q turini
- * foydalanuvchi o'zi yozadi — u ham saqlanadi va keyingi safar ro'yxatga qo'shiladi.
+ * Birinchi ishga tushishda `expense_category` jadvaliga yoziladigan tayyor turlar. Keyin ro'yxat
+ * UI da tahrirlanadi (qayta nomlash, o'chirish); "Другое" bilan yozilgan yangi tur ham unga qo'shiladi.
  */
 export const DEFAULT_EXPENSE_CATEGORIES = [
   'Газ',

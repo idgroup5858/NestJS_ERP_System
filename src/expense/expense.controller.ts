@@ -6,11 +6,6 @@ import { ExpenseService } from './expense.service';
 export class ExpenseController {
   constructor(private readonly expenseService: ExpenseService) { }
 
-  @Get('categories')
-  categories() {
-    return this.expenseService.categories();
-  }
-
   @Post('add')
   create(@Body() dto: CreateExpenseDto) {
     return this.expenseService.create(dto);

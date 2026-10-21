@@ -4,7 +4,7 @@ import { Repository, SelectQueryBuilder } from 'typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { CreateExpenseDto, MONTH_PATTERN, UpdateExpenseDto } from './dto/expense.dto';
 import { Expense } from './entities/expense.entity';
-import { DEFAULT_EXPENSE_CATEGORIES } from './expense-categories';
+import { ExpenseCategoryService } from './expense-category.service';
 
 const MAX_LIMIT = 100;
 
@@ -24,20 +24,8 @@ export class ExpenseService {
     private readonly expenses: Repository<Expense>,
     @InjectRepository(User)
     private readonly users: Repository<User>,
+    private readonly categories: ExpenseCategoryService,
   ) { }
-
-  /** Tayyor turlar + oldin qo'lda yozilganlar (takrorlarsiz). */
-  async categories() {
-    const rows: { category: string }[] = await this.expenses.createQueryBuilder('e')
-      .select('DISTINCT e.category', 'category')
-      .orderBy('e.category', 'ASC')
-      .getRawMany();
-
-    const defaults = [...DEFAULT_EXPENSE_CATEGORIES] as string[];
-    const known = new Set(defaults.map((c) => c.toLowerCase()));
-    const custom = rows.map((r) => r.category).filter((c) => !known.has(c.toLowerCase()));
-    return { defaults, custom };
-  }
 
   private async userRef(userId?: number) {
     if (!userId) return null;
@@ -47,7 +35,7 @@ export class ExpenseService {
 
   async create(dto: CreateExpenseDto) {
     const expense = await this.expenses.save(this.expenses.create({
-      category: dto.category,
+      category: await this.categories.resolve(dto.category),
       period: monthToPeriod(dto.month),
       amount: dto.amount,
       comment: dto.comment || null,
@@ -129,7 +117,7 @@ export class ExpenseService {
     const expense = await this.expenses.findOneBy({ id });
     if (!expense) throw new NotFoundException('Расход не найден');
 
-    if (dto.category !== undefined) expense.category = dto.category;
+    if (dto.category !== undefined) expense.category = await this.categories.resolve(dto.category);
     if (dto.month !== undefined) expense.period = monthToPeriod(dto.month);
     if (dto.amount !== undefined) expense.amount = dto.amount;
     if (dto.comment !== undefined) expense.comment = dto.comment || null;
