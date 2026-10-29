@@ -8,7 +8,9 @@ export type Granularity = (typeof GRANULARITIES)[number];
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_BUCKETS = 800;
-const HISTORY_TYPES = ['sale', 'return', 'purchase', 'expense'] as const;
+const HISTORY_TYPES = ['sale', 'return', 'purchase', 'expense', 'salary'] as const;
+/** Oylik to'lovlari xarajatlar kesimida shu tur nomi bilan chiqadi (xarajatlardagi "Зарплата" bilan birlashadi). */
+const SALARY_CATEGORY = 'Зарплата';
 
 /*
  * Barcha vaqt hisoblari biznes vaqt mintaqasida ($1). Ustunlar `timestamp without time zone`
@@ -20,7 +22,10 @@ const local = (col: string, tz = '$1') =>
 /** Chegaralar — "YYYY-MM-DD", ikkalasi ham kiradi. Postgres ishlatilmagan parametrni qabul qilmaydi, shuning uchun o'rinlari beriladi. */
 const inRange = (col: string, tz = '$1', from = '$2', to = '$3') =>
   `${local(col, tz)} >= ${from}::date AND ${local(col, tz)} < (${to}::date + 1)`;
-/** Xarajat oyga yoziladi: davr ichiga tushgan har bir oyning xarajati to'liq olinadi. */
+/**
+ * Xarajat oyga yoziladi: davr ichiga tushgan har bir oyning xarajati to'liq olinadi.
+ * Oylik to'lovlari (`salary_payment`) ham xarajat — ular ham qaysi oy uchun berilgan bo'lsa, o'sha oyga.
+ */
 const expenseInRange = (from = '$2', to = '$3') =>
   `e.period >= date_trunc('month', ${from}::date::timestamp)::date AND e.period <= ${to}::date`;
 
@@ -160,7 +165,9 @@ export class StatsService implements OnModuleInit {
         (SELECT count(*) FROM purchase pu WHERE ${inRange('pu.date')}) AS purchases_count,
         (SELECT coalesce(sum(pu.total - pu.discount), 0) FROM purchase pu WHERE ${inRange('pu.date')}) AS purchases,
         (SELECT coalesce(sum(e.amount), 0) FROM expense e WHERE ${expenseInRange()}) AS expenses,
-        (SELECT count(*) FROM expense e WHERE ${expenseInRange()}) AS expenses_count
+        (SELECT count(*) FROM expense e WHERE ${expenseInRange()}) AS expenses_count,
+        (SELECT coalesce(sum(e.amount), 0) FROM salary_payment e WHERE ${expenseInRange()}) AS salaries,
+        (SELECT count(*) FROM salary_payment e WHERE ${expenseInRange()}) AS salaries_count
       `,
       [this.timezone, from, to, OFFSET_METHOD],
     );
@@ -172,7 +179,8 @@ export class StatsService implements OnModuleInit {
     const salesCount = num(row.sales_count);
     const cogs = money(row.cogs) - money(row.returns_cogs);
     const grossProfit = salesNet - returns - cogs;
-    const expenses = money(row.expenses);
+    const salaries = money(row.salaries);
+    const expenses = money(row.expenses) + salaries;
 
     return {
       salesCount,
@@ -190,8 +198,10 @@ export class StatsService implements OnModuleInit {
       purchasesCount: num(row.purchases_count),
       purchases: money(row.purchases),
       supplierPaid: money(row.supplier_paid),
-      expensesCount: num(row.expenses_count),
+      expensesCount: num(row.expenses_count) + num(row.salaries_count),
+      // Oylik to'lovlari — `expenses` ichida (alohida ham beriladi).
       expenses,
+      salaries,
       cogs,
       grossProfit,
       netProfit: grossProfit - expenses,
@@ -246,8 +256,12 @@ export class StatsService implements OnModuleInit {
         FROM purchase pu WHERE ${inRange('pu.date')} GROUP BY 1
       ),
       e AS (
-        SELECT date_trunc($4, e.period::timestamp) AS b, sum(e.amount) AS amount
-        FROM expense e WHERE ${expenseInRange()} GROUP BY 1
+        SELECT date_trunc($4, x.period::timestamp) AS b, sum(x.amount) AS amount
+        FROM (
+          SELECT e.period, e.amount FROM expense e WHERE ${expenseInRange()}
+          UNION ALL
+          SELECT e.period, e.amount FROM salary_payment e WHERE ${expenseInRange()}
+        ) x GROUP BY 1
       )
       SELECT to_char(buckets.b, 'YYYY-MM-DD') AS bucket,
         coalesce(s.cnt, 0) AS sales_count, coalesce(s.net, 0) AS sales_net,
@@ -317,9 +331,13 @@ export class StatsService implements OnModuleInit {
         WHERE pm."saleId" IS NOT NULL AND pm.amount > 0 AND pm.method <> $4 AND ${inRange('pm.date')}
         GROUP BY pm.method ORDER BY amount DESC`, [...params, OFFSET_METHOD]),
       this.dataSource.query(`
-        SELECT e.category, count(*) AS cnt, sum(e.amount) AS amount
-        FROM expense e WHERE ${expenseInRange('$1', '$2')}
-        GROUP BY e.category ORDER BY amount DESC`, [from, to]),
+        SELECT x.category, count(*) AS cnt, sum(x.amount) AS amount
+        FROM (
+          SELECT e.category, e.amount FROM expense e WHERE ${expenseInRange('$1', '$2')}
+          UNION ALL
+          SELECT $3::varchar, e.amount FROM salary_payment e WHERE ${expenseInRange('$1', '$2')}
+        ) x
+        GROUP BY x.category ORDER BY amount DESC`, [from, to, SALARY_CATEGORY]),
       this.dataSource.query(`
         SELECT c.id, c.username, c.surname, c.phone,
                sum(greatest(0, s.total - s.discount - coalesce(p.paid, 0))) AS debt
@@ -398,6 +416,79 @@ export class StatsService implements OnModuleInit {
     };
   }
 
+  /**
+   * Maosh vedomosti davr oylari bo'yicha (xarajatlar kabi: davrga tushgan har bir oy to'liq).
+   * Mantiq "Зарплата" vedomosti bilan bir xil: oyga okladi shu oy oxirigacha belgilangan yoki shu oyda
+   * to'lovi bor xodimlar kiradi; norma — oyning to'lovlarida muhrlangani, bo'lmasa joriy oklad.
+   * Holat xodim bo'yicha butun davrga: hech narsa olmagan / qisman / to'liq.
+   */
+  private async payroll(from: string, to: string) {
+    const rows: Record<string, unknown>[] = await this.dataSource.query(
+      `
+      WITH months AS (
+        SELECT generate_series(date_trunc('month', $1::date), date_trunc('month', $2::date), interval '1 month')::date AS period
+      ),
+      paid AS (
+        SELECT sp."employeeId" AS employee, sp.period, min(sp.norm) AS norm, sum(sp.amount) AS paid,
+               coalesce(sum(sp.amount) FILTER (WHERE sp.type = 'advance'), 0) AS advance
+        FROM salary_payment sp
+        WHERE sp."employeeId" IS NOT NULL
+          AND sp.period >= date_trunc('month', $1::date)::date AND sp.period <= $2::date
+        GROUP BY 1, 2
+      ),
+      lines AS (
+        SELECT u.id, coalesce(p.norm, s.amount) AS norm, coalesce(p.paid, 0) AS paid, coalesce(p.advance, 0) AS advance
+        FROM months m
+        CROSS JOIN "user" u
+        LEFT JOIN salary s ON s."employeeId" = u.id
+        LEFT JOIN paid p ON p.employee = u.id AND p.period = m.period
+        WHERE p.employee IS NOT NULL OR s."createdAt" < m.period + interval '1 month'
+      )
+      SELECT l.id, u.username, u.surname,
+             sum(l.norm) AS norm, sum(l.paid) AS paid, sum(l.advance) AS advance,
+             sum(greatest(l.norm - l.paid, 0)) AS remaining, sum(greatest(l.paid - l.norm, 0)) AS overpaid
+      FROM lines l JOIN "user" u ON u.id = l.id
+      GROUP BY l.id, u.username, u.surname
+      ORDER BY remaining DESC, u.username
+      `,
+      [from, to],
+    );
+
+    const employees = rows.map((r) => {
+      const paid = money(r.paid);
+      const remaining = money(r.remaining);
+      return {
+        id: r.id as number,
+        name: person(r.username as string, r.surname as string),
+        norm: money(r.norm),
+        paid,
+        remaining,
+        status: paid <= 0 ? 'not_paid' : remaining > 0 ? 'partial' : 'paid',
+      };
+    });
+    const total = (key: 'norm' | 'paid' | 'remaining') => employees.reduce((sum, e) => sum + e[key], 0);
+    const count = (status: string) => employees.filter((e) => e.status === status).length;
+    const [fromYear, fromMonth] = from.split('-').map(Number);
+    const [toYear, toMonth] = to.split('-').map(Number);
+
+    return {
+      months: {
+        from: from.slice(0, 7),
+        to: to.slice(0, 7),
+        count: (toYear - fromYear) * 12 + (toMonth - fromMonth) + 1,
+      },
+      employees: employees.length,
+      norm: total('norm'),
+      paid: total('paid'),
+      advance: rows.reduce((sum, r) => sum + money(r.advance), 0),
+      remaining: total('remaining'),
+      overpaid: rows.reduce((sum, r) => sum + money(r.overpaid), 0),
+      counts: { paid: count('paid'), partial: count('partial'), not_paid: count('not_paid') },
+      // Kimga eng ko'p to'lash qolgan (dashboard dagi ro'yxat uchun).
+      owed: employees.filter((e) => e.remaining > 0).slice(0, 5),
+    };
+  }
+
   /** Tanlangan davr: jami, oldingi teng davr bilan solishtirish, dinamika va kesimlar. */
   async dashboard(fromRaw?: string, toRaw?: string, granularityRaw?: string) {
     const { from, to, days } = this.parseRange(fromRaw, toRaw);
@@ -412,13 +503,14 @@ export class StatsService implements OnModuleInit {
 
     const previousRange = { from: shiftDate(from, -days), to: shiftDate(from, -1) };
 
-    const [current, previous, series, breakdowns, debt, masterFees] = await Promise.all([
+    const [current, previous, series, breakdowns, debt, masterFees, payroll] = await Promise.all([
       this.summary(from, to),
       this.summary(previousRange.from, previousRange.to),
       this.series(from, to, granularity),
       this.breakdowns(from, to),
       this.debt(),
       this.masterFeeStats(from, to),
+      this.payroll(from, to),
     ]);
 
     return {
@@ -430,6 +522,8 @@ export class StatsService implements OnModuleInit {
       debt,
       // Usta xizmatlari: do'konniki emas, daromad va foydaga kirmaydi — alohida ko'rsatiladi.
       masterFees,
+      // Maosh vedomosti davr oylari bo'yicha: hisoblangan, to'langan, qolgan.
+      payroll,
       series,
       ...breakdowns,
     };
@@ -502,7 +596,7 @@ export class StatsService implements OnModuleInit {
     page = page > 0 ? page : 1;
     limit = limit > 0 ? Math.min(limit, 100) : 20;
     if (type && !(HISTORY_TYPES as readonly string[]).includes(type)) {
-      throw new BadRequestException('type: sale | return | purchase | expense');
+      throw new BadRequestException('type: sale | return | purchase | expense | salary');
     }
     const range = from || to ? this.parseRange(from, to) : null;
 
@@ -524,6 +618,12 @@ export class StatsService implements OnModuleInit {
       SELECT 'expense', e.id, e."createdAt", e.amount, e.category, concat_ws(' ', u.username, u.surname),
              concat_ws(' · ', 'за ' || to_char(e.period::timestamp, 'MM.YYYY'), nullif(e.comment, ''))
       FROM expense e LEFT JOIN "user" u ON u.id = e."userId"
+      UNION ALL
+      SELECT 'salary', sp.id, sp."createdAt", sp.amount,
+             concat_ws(' ', emp.username, emp.surname), concat_ws(' ', u.username, u.surname),
+             concat_ws(' · ', 'за ' || to_char(sp.period::timestamp, 'MM.YYYY'),
+                       CASE WHEN sp.type = 'advance' THEN 'аванс' END, nullif(sp.comment, ''))
+      FROM salary_payment sp LEFT JOIN "user" emp ON emp.id = sp."employeeId" LEFT JOIN "user" u ON u.id = sp."userId"
     `;
 
     const conditions: string[] = ['($1::text IS NULL OR h.type = $1)'];

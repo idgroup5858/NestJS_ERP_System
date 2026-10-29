@@ -27,6 +27,7 @@ import { StatsModule } from './stats/stats.module';
 import { ContractModule } from './contract/contract.module';
 import { AttachmentModule } from './attachment/attachment.module';
 import { AppSettingModule } from './app_setting/app_setting.module';
+import { SalaryModule } from './salary/salary.module';
 
 @Module({
   imports: [CustomerModule, UserModule, WarehouseModule, ProductModule, SaleModule, StockModule, PaymentModule, SaleItemsModule, DatabaseModule,
@@ -52,6 +53,7 @@ import { AppSettingModule } from './app_setting/app_setting.module';
     AttachmentModule,
     ContractModule,
     AppSettingModule,
+    SalaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
