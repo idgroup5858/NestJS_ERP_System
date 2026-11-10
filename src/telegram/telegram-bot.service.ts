@@ -7,7 +7,8 @@ import { TelegramChat } from './entities/telegram-chat.entity';
 import { Sale } from 'src/sale/entities/sale.entity';
 import { SaleMasterFee } from 'src/sale/entities/sale-master-fee.entity';
 import { Return } from 'src/return/entities/return.entity';
-import { OFFSET_METHOD } from 'src/payment/payment-methods';
+import { CustomerBalanceEntry } from 'src/customer/entities/customer-balance-entry.entity';
+import { BALANCE_PAY_METHOD, BALANCE_REFUND_METHOD, OFFSET_METHOD } from 'src/payment/payment-methods';
 
 export type BotStatus = 'starting' | 'running' | 'offline' | 'conflict' | 'error' | 'stopped';
 type Period = 'day' | 'week' | 'month';
@@ -344,6 +345,30 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
     });
   }
 
+  /** Mijoz balansini to'ldirish yoki balansdan pul qaytarish haqida xabar (kassaga kirim/chiqim). Kutilmaydi. */
+  notifyBalance(entryId: number) {
+    void this.safely(async () => {
+      const entry = await this.dataSource.manager.findOne(CustomerBalanceEntry, {
+        where: { id: entryId },
+        relations: ['customer', 'user'],
+      });
+      if (!entry || (entry.type !== 'deposit' && entry.type !== 'withdraw')) return;
+      const [row]: { balance: string }[] = await this.dataSource.query(
+        'SELECT coalesce(sum(amount), 0) AS balance FROM customer_balance_entry WHERE "customerId" = $1',
+        [entry.customer.id],
+      );
+      const deposit = entry.type === 'deposit';
+      const lines = [
+        ...this.header('💼', deposit ? 'Пополнение баланса клиента' : 'Выдача денег с баланса клиента', entry.date, entry.user, entry.customer),
+        '',
+        `${deposit ? '➕ Внесено' : '➖ Выдано'} (${esc(entry.method ?? '—')}): <b>${money(Math.abs(entry.amount))} so'm</b>`,
+        `Баланс клиента: ${money(Number(row?.balance ?? 0))}`,
+      ];
+      if (entry.note) lines.push(`📝 ${esc(entry.note)}`);
+      await this.broadcast(lines.join('\n'));
+    });
+  }
+
   private async safely(fn: () => Promise<void>) {
     try {
       await fn();
@@ -427,7 +452,9 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
     }
     lines.push(`<b>Итого: ${money(net)} so'm</b>`);
     for (const p of sale.payments) {
-      if (p.amount > 0) lines.push(`${p.method === 'Наличные' ? '💵' : '💳'} ${esc(p.method)}: ${money(p.amount)}`);
+      if (p.amount <= 0) continue;
+      const icon = p.method === 'Наличные' ? '💵' : p.method === BALANCE_PAY_METHOD ? '💼' : '💳';
+      lines.push(`${icon} ${esc(p.method)}: ${money(p.amount)}`);
     }
     if (net - paid > 0) lines.push(`⚠️ В долг: ${money(net - paid)}`);
     return lines.join('\n');
@@ -460,6 +487,7 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
     ];
     for (const p of ret.payments) {
       if (p.method === OFFSET_METHOD) lines.push(`➖ Списано с долга: ${money(p.amount)}`);
+      else if (p.method === BALANCE_REFUND_METHOD) lines.push(`💼 Зачислено на баланс клиента: ${money(p.amount)}`);
       else if (p.amount > 0) lines.push(`💵 Выдано клиенту (${esc(p.method)}): ${money(p.amount)}`);
     }
     return lines.join('\n');

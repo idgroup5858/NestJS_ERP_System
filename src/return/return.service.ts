@@ -9,7 +9,8 @@ import { ReturnItem } from 'src/return_items/entities/return_item.entity';
 import { Sale } from 'src/sale/entities/sale.entity';
 import { SaleItem } from 'src/sale_items/entities/sale_item.entity';
 import { Payment } from 'src/payment/entities/payment.entity';
-import { OFFSET_METHOD } from 'src/payment/payment-methods';
+import { BALANCE_REFUND_METHOD, OFFSET_METHOD, isNonCashMethod } from 'src/payment/payment-methods';
+import { CustomerBalanceService } from 'src/customer/customer-balance.service';
 import { Stock } from 'src/stock/entities/stock.entity';
 import { ReturnItemsService } from 'src/return_items/return_items.service';
 import { PaymentService } from 'src/payment/payment.service';
@@ -26,7 +27,8 @@ export class ReturnService {
     private readonly returnItemsService: ReturnItemsService,
     private readonly paymentService: PaymentService,
     private readonly stockService: StockService,
-    private readonly telegramBot: TelegramBotService
+    private readonly telegramBot: TelegramBotService,
+    private readonly balanceService: CustomerBalanceService,
 
   ) { }
 
@@ -37,7 +39,8 @@ export class ReturnService {
    * - Har bir qatordan sotilganidan (oldingi qaytarishlarni ayirib) koʻp qaytarib boʻlmaydi.
    * - Narx — savdodagi narx; savdo chegirmasi mutanosib taqsimlanadi.
    * - Savdoda qarz qolgan boʻlsa, summa avval qarzdan ayiriladi, qolgani
-   *   mijozga `method` usulida qaytariladi.
+   *   mijozga `method` usulida qaytariladi. `method` = «На баланс» boʻlsa — pul
+   *   berilmaydi, mijoz balansiga yoziladi (keyin qarzni yopish yoki yangi savdo uchun).
    *
    * Qaytarish, tovarning omborga qaytishi va toʻlovlar bitta tranzaksiyada
    * yoziladi — yarim-yozilgan qaytarish qolmaydi.
@@ -87,6 +90,14 @@ export class ReturnService {
 
       const method = dto.method?.trim();
       if (refund > 0 && !method) throw new BadRequestException('Выберите способ возврата денег');
+      // "На баланс": pul naqd berilmaydi, mijozning balansida qoladi (keyin qarz yoki yangi savdoga ishlatiladi).
+      const toBalance = method === BALANCE_REFUND_METHOD;
+      if (refund > 0 && toBalance && !sale.customer) {
+        throw new BadRequestException('В продаже нет контрагента — зачислить на баланс нельзя');
+      }
+      if (refund > 0 && !toBalance && isNonCashMethod(method)) {
+        throw new BadRequestException('Этот способ возврата денег выбрать нельзя');
+      }
 
       const returns = await manager.save(manager.create(Return, {
         customer: sale.customer ? { id: sale.customer.id } : undefined,
@@ -122,7 +133,14 @@ export class ReturnService {
         }
       }
 
-      if (refund > 0) {
+      if (refund > 0 && toBalance) {
+        await this.balanceService.creditReturn(manager, {
+          customerId: sale.customer.id,
+          returnId: returns.id,
+          amount: refund,
+          userId: dto.user_id,
+        });
+      } else if (refund > 0) {
         await manager.save(manager.create(Payment, { returns: { id: returns.id }, amount: refund, method }));
       }
       if (offset > 0) {
@@ -130,7 +148,8 @@ export class ReturnService {
         await manager.save(manager.create(Payment, { sale: { id: sale.id }, amount: offset, method: OFFSET_METHOD }));
       }
 
-      return { id: returns.id, total: gross, value, offset, refund };
+      const balance = toBalance && sale.customer ? await this.balanceService.lock(manager, sale.customer.id) : null;
+      return { id: returns.id, total: gross, value, offset, refund, toBalance: toBalance && refund > 0, balance };
     });
 
     // Tranzaksiya yakunlangach — Telegram ga (javobni kutmasdan).
@@ -148,6 +167,19 @@ export class ReturnService {
       total += item.quantity * item.price;
     }
     total = roundMoney(total);
+
+    // "На баланс": qaytarish summasi naqd berilmay, kontragent balansiga yoziladi — kontragent majburiy.
+    const payments = createReturnsDto.payments ?? [];
+    const isBalance = (method?: string) => method?.trim() === BALANCE_REFUND_METHOD;
+    if (payments.some((payment) => isNonCashMethod(payment.method) && !isBalance(payment.method))) {
+      throw new BadRequestException('Этот способ возврата денег выбрать нельзя');
+    }
+    if (payments.some((payment) => isBalance(payment.method) && Number(payment.amount) > 0)) {
+      if (!createReturnsDto.customer_id) throw new BadRequestException('Чтобы зачислить на баланс, выберите контрагента');
+      if (payments.some((payment) => isBalance(payment.method) && !Number.isInteger(Number(payment.amount)))) {
+        throw new BadRequestException('Сумма должна быть целым числом');
+      }
+    }
 
     await this.stockService.assertAvailable(createReturnsDto.items, false);
 
@@ -167,7 +199,19 @@ export class ReturnService {
       });
     }
 
-    for (const payment of createReturnsDto.payments) {
+    for (const payment of payments) {
+      if (isBalance(payment.method)) {
+        const amount = Number(payment.amount);
+        if (amount > 0) {
+          await this.returnRepository.manager.transaction((em) => this.balanceService.creditReturn(em, {
+            customerId: createReturnsDto.customer_id,
+            returnId: returns.id,
+            amount,
+            userId: createReturnsDto.user_id,
+          }));
+        }
+        continue;
+      }
       await this.paymentService.createReturn({
         ...payment,
         return_id: returns.id

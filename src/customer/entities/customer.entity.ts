@@ -20,7 +20,10 @@ export class Customer {
         @Column({ type: 'varchar', unique: true, nullable: true })
         phone: string | null;
     
-          
+        /**
+         * Mijozning do'kondagi puli (avans, balansga yozilgan qaytarishlar). Faqat o'qish uchun: balans yozuvlari
+         * (`customer_balance_entry`) yig'indisi, bazadagi trigger uni yangilab turadi — qo'lda yozilmaydi.
+         */
         @Column({default:0})
         balance: number;
     

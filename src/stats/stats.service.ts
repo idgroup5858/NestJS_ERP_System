@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
-import { OFFSET_METHOD } from 'src/payment/payment-methods';
+import { NON_CASH_METHODS } from 'src/payment/payment-methods';
 
 export const GRANULARITIES = ['day', 'week', 'month', 'year'] as const;
 export type Granularity = (typeof GRANULARITIES)[number];
@@ -157,9 +157,13 @@ export class StatsService implements OnModuleInit {
           JOIN "return" r ON r.id = ri."returnsId" LEFT JOIN product p ON p.id = ri."productId"
           WHERE ${inRange('r.date')}) AS returns_cogs,
         (SELECT coalesce(sum(pm.amount), 0) FROM payment pm
-          WHERE pm."saleId" IS NOT NULL AND pm.method <> $4 AND ${inRange('pm.date')}) AS cash_in,
+          WHERE pm."saleId" IS NOT NULL AND pm.method <> ALL($4::varchar[]) AND ${inRange('pm.date')}) AS cash_in,
         (SELECT coalesce(sum(pm.amount), 0) FROM payment pm
-          WHERE pm."returnsId" IS NOT NULL AND pm.method <> $4 AND ${inRange('pm.date')}) AS refunds,
+          WHERE pm."returnsId" IS NOT NULL AND pm.method <> ALL($4::varchar[]) AND ${inRange('pm.date')}) AS refunds,
+        (SELECT coalesce(sum(b.amount), 0) FROM customer_balance_entry b
+          WHERE b.type = 'deposit' AND ${inRange('b.date')}) AS deposits,
+        (SELECT coalesce(-sum(b.amount), 0) FROM customer_balance_entry b
+          WHERE b.type = 'withdraw' AND ${inRange('b.date')}) AS withdrawals,
         (SELECT coalesce(sum(pm.amount), 0) FROM payment pm
           WHERE pm."purchaseId" IS NOT NULL AND ${inRange('pm.date')}) AS supplier_paid,
         (SELECT count(*) FROM purchase pu WHERE ${inRange('pu.date')}) AS purchases_count,
@@ -169,7 +173,7 @@ export class StatsService implements OnModuleInit {
         (SELECT coalesce(sum(e.amount), 0) FROM salary_payment e WHERE ${expenseInRange()}) AS salaries,
         (SELECT count(*) FROM salary_payment e WHERE ${expenseInRange()}) AS salaries_count
       `,
-      [this.timezone, from, to, OFFSET_METHOD],
+      [this.timezone, from, to, NON_CASH_METHODS],
     );
 
     const gross = money(row.gross);
@@ -193,8 +197,12 @@ export class StatsService implements OnModuleInit {
       returns,
       revenue: salesNet - returns,
       averageCheck: salesCount ? Math.round(salesNet / salesCount) : 0,
-      cashIn: money(row.cash_in),
-      refunds: money(row.refunds),
+      // Kassaga kelgan pul: savdo to'lovlari (balansdan to'langani emas) + mijozlar balansiga olib kelgan pul (avans).
+      cashIn: money(row.cash_in) + money(row.deposits),
+      // Kassadan chiqqan pul: qaytarishlarda berilgani (balansga yozilgani emas) + balansdan mijozga qaytarilgani.
+      refunds: money(row.refunds) + money(row.withdrawals),
+      balanceDeposits: money(row.deposits),
+      balanceWithdrawals: money(row.withdrawals),
       purchasesCount: num(row.purchases_count),
       purchases: money(row.purchases),
       supplierPaid: money(row.supplier_paid),
@@ -208,16 +216,26 @@ export class StatsService implements OnModuleInit {
     };
   }
 
-  /** Hozirgi umumiy qarz (barcha vaqt). To'lovlarga qaytarish hisobidan yopilgan qism ham kiradi. */
+  /**
+   * Hozirgi umumiy qarz (barcha vaqt). To'lovlarga qaytarish hisobidan va balansdan yopilgan qism ham kiradi.
+   * `balances` — mijozlarning do'kondagi puli (balanslar yig'indisi): do'konning mijozlar oldidagi majburiyati.
+   */
   private async debt() {
     const [row]: Record<string, unknown>[] = await this.dataSource.query(`
       SELECT coalesce(sum(greatest(0, s.total - s.discount - coalesce(p.paid, 0))), 0) AS debt,
-             count(*) FILTER (WHERE s.total - s.discount - coalesce(p.paid, 0) > 0) AS debt_sales
+             count(*) FILTER (WHERE s.total - s.discount - coalesce(p.paid, 0) > 0) AS debt_sales,
+             (SELECT coalesce(sum(amount), 0) FROM customer_balance_entry) AS balances,
+             (SELECT count(*) FROM customer WHERE balance > 0) AS balance_customers
       FROM sale s
       LEFT JOIN (SELECT "saleId", sum(amount) AS paid FROM payment WHERE "saleId" IS NOT NULL GROUP BY "saleId") p
         ON p."saleId" = s.id
     `);
-    return { amount: money(row.debt), sales: num(row.debt_sales) };
+    return {
+      amount: money(row.debt),
+      sales: num(row.debt_sales),
+      balances: money(row.balances),
+      balanceCustomers: num(row.balance_customers),
+    };
   }
 
   private async series(from: string, to: string, granularity: Granularity) {
@@ -247,9 +265,17 @@ export class StatsService implements OnModuleInit {
         WHERE ${inRange('r.date')} GROUP BY 1
       ),
       pm AS (
-        SELECT date_trunc($4, ${local('pm.date')}) AS b,
-               sum(pm.amount) FILTER (WHERE pm."saleId" IS NOT NULL AND pm.method <> $6) AS cash_in
-        FROM payment pm WHERE ${inRange('pm.date')} GROUP BY 1
+        SELECT x.b, sum(x.amount) AS cash_in
+        FROM (
+          SELECT date_trunc($4, ${local('pm.date')}) AS b, pm.amount
+          FROM payment pm
+          WHERE pm."saleId" IS NOT NULL AND pm.method <> ALL($6::varchar[]) AND ${inRange('pm.date')}
+          UNION ALL
+          -- Mijoz balansiga olib kelgan pul (avans) ham kassaga kirim.
+          SELECT date_trunc($4, ${local('bd.date')}) AS b, bd.amount
+          FROM customer_balance_entry bd
+          WHERE bd.type = 'deposit' AND ${inRange('bd.date')}
+        ) x GROUP BY 1
       ),
       pu AS (
         SELECT date_trunc($4, ${local('pu.date')}) AS b, sum(pu.total - pu.discount) AS amount
@@ -274,7 +300,7 @@ export class StatsService implements OnModuleInit {
       LEFT JOIN e ON e.b = buckets.b
       ORDER BY buckets.b
       `,
-      [this.timezone, from, to, granularity, step, OFFSET_METHOD],
+      [this.timezone, from, to, granularity, step, NON_CASH_METHODS],
     );
 
     return rows.map((row) => {
@@ -325,11 +351,17 @@ export class StatsService implements OnModuleInit {
         FROM sale s JOIN "user" u ON u.id = s."userId"
         WHERE ${inRange('s.date')}
         GROUP BY u.id ORDER BY revenue DESC LIMIT 10`, params),
+      // Kassaga kelgan pul usullar bo'yicha: savdo to'lovlari + mijozlar balansiga olib kelgan pul (umumiy `cashIn` bilan mos).
       this.dataSource.query(`
-        SELECT pm.method, count(*) AS cnt, sum(pm.amount) AS amount
-        FROM payment pm
-        WHERE pm."saleId" IS NOT NULL AND pm.amount > 0 AND pm.method <> $4 AND ${inRange('pm.date')}
-        GROUP BY pm.method ORDER BY amount DESC`, [...params, OFFSET_METHOD]),
+        SELECT x.method, count(*) AS cnt, sum(x.amount) AS amount
+        FROM (
+          SELECT pm.method, pm.amount FROM payment pm
+          WHERE pm."saleId" IS NOT NULL AND pm.amount > 0 AND pm.method <> ALL($4::varchar[]) AND ${inRange('pm.date')}
+          UNION ALL
+          SELECT coalesce(b.method, '—'), b.amount FROM customer_balance_entry b
+          WHERE b.type = 'deposit' AND ${inRange('b.date')}
+        ) x
+        GROUP BY x.method ORDER BY amount DESC`, [...params, NON_CASH_METHODS]),
       this.dataSource.query(`
         SELECT x.category, count(*) AS cnt, sum(x.amount) AS amount
         FROM (

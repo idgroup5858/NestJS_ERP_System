@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { OFFSET_METHOD } from 'src/payment/payment-methods';
+import { NON_CASH_METHODS } from 'src/payment/payment-methods';
 import { Customer } from './entities/customer.entity';
 import { OPERATIONS_MAX_LIMIT, OperationType } from './dto/customer-operations-query.dto';
 
@@ -42,7 +42,7 @@ export class CustomerProfileService {
   async profile(id: number) {
     const customer = await this.requireCustomer(id);
 
-    const [sales, returns, purchases, methods, products, months] = await Promise.all([
+    const [sales, returns, purchases, methods, products, months, balances] = await Promise.all([
       this.dataSource.query(`
         SELECT count(*) AS cnt,
                coalesce(sum(s.total), 0) AS gross,
@@ -54,18 +54,18 @@ export class CustomerProfileService {
                count(*) FILTER (WHERE s.total - s.discount - coalesce(p.paid, 0) > 0) AS debt_sales,
                min(s.date) AS first_at, max(s.date) AS last_at
         FROM sale s
-        LEFT JOIN (SELECT "saleId", sum(amount) AS paid, sum(amount) FILTER (WHERE method <> $2) AS cash
+        LEFT JOIN (SELECT "saleId", sum(amount) AS paid, sum(amount) FILTER (WHERE method <> ALL($2::varchar[])) AS cash
                    FROM payment WHERE "saleId" IS NOT NULL GROUP BY "saleId") p ON p."saleId" = s.id
-        WHERE s."customerId" = $1`, [id, OFFSET_METHOD]),
+        WHERE s."customerId" = $1`, [id, NON_CASH_METHODS]),
       this.dataSource.query(`
         SELECT count(*) AS cnt,
                coalesce(sum(r.total - r.discount), 0) AS net,
                coalesce(sum(coalesce(p.cash, 0)), 0) AS cash,
                max(r.date) AS last_at
         FROM "return" r
-        LEFT JOIN (SELECT "returnsId", sum(amount) FILTER (WHERE method <> $2) AS cash
+        LEFT JOIN (SELECT "returnsId", sum(amount) FILTER (WHERE method <> ALL($2::varchar[])) AS cash
                    FROM payment WHERE "returnsId" IS NOT NULL GROUP BY "returnsId") p ON p."returnsId" = r.id
-        WHERE r."customerId" = $1`, [id, OFFSET_METHOD]),
+        WHERE r."customerId" = $1`, [id, NON_CASH_METHODS]),
       this.dataSource.query(`
         SELECT count(*) AS cnt,
                coalesce(sum(pu.total - pu.discount), 0) AS net,
@@ -79,8 +79,8 @@ export class CustomerProfileService {
       this.dataSource.query(`
         SELECT pm.method, count(*) AS cnt, sum(pm.amount) AS amount
         FROM payment pm JOIN sale s ON s.id = pm."saleId"
-        WHERE s."customerId" = $1 AND pm.amount > 0 AND pm.method <> $2
-        GROUP BY pm.method ORDER BY amount DESC`, [id, OFFSET_METHOD]),
+        WHERE s."customerId" = $1 AND pm.amount > 0 AND pm.method <> ALL($2::varchar[])
+        GROUP BY pm.method ORDER BY amount DESC`, [id, NON_CASH_METHODS]),
       this.dataSource.query(`
         SELECT pr.id, pr.name, pr.unit, sum(x.qty) AS qty, sum(x.amount) AS amount
         FROM (
@@ -102,11 +102,15 @@ export class CustomerProfileService {
           coalesce((SELECT sum(total - discount) FROM "return"
                     WHERE "customerId" = $1 AND date >= m.start AND date < m.start + interval '1 month'), 0) AS returns
         FROM m ORDER BY m.start`, [id]),
+      // Mijoz balansi (do'kondagi puli) — balans yozuvlari yig'indisi.
+      this.dataSource.query(
+        `SELECT coalesce(sum(amount), 0) AS balance FROM customer_balance_entry WHERE "customerId" = $1`, [id]),
     ]);
 
     const s: Row = sales[0];
     const r: Row = returns[0];
     const p: Row = purchases[0];
+    const b: Row = balances[0];
 
     const salesCount = num(s.cnt);
     const salesNet = money(s.net);
@@ -144,6 +148,8 @@ export class CustomerProfileService {
         received: money(s.cash),
         debt: money(s.debt),
         debtSales: num(s.debt_sales),
+        /** Mijozning do'kondagi puli: qarzni yopish yoki yangi savdo uchun ishlatiladi. */
+        balance: money(b.balance),
         averageCheck: salesCount > 0 ? Math.round(salesNet / salesCount) : 0,
         returnsCount: num(r.cnt),
         returnsNet,
@@ -197,7 +203,7 @@ export class CustomerProfileService {
         return `
           SELECT '${key}'::text AS type, x.id, x.date, x.total, x.discount, ${parent} AS sale_id, x."userId" AS user_id,
                  coalesce((SELECT sum(amount) FROM payment WHERE ${source.paymentKey} = x.id), 0) AS paid,
-                 coalesce((SELECT sum(amount) FROM payment WHERE ${source.paymentKey} = x.id AND method <> $2), 0) AS cash
+                 coalesce((SELECT sum(amount) FROM payment WHERE ${source.paymentKey} = x.id AND method <> ALL($2::varchar[])), 0) AS cash
           FROM ${source.table} x WHERE x."customerId" = $1`;
       })
       .join('\nUNION ALL\n');
@@ -217,14 +223,14 @@ export class CustomerProfileService {
                 count(*) FILTER (WHERE ops.type = 'purchase') AS purchases_cnt,
                 coalesce(sum(ops.total - ops.discount) FILTER (WHERE ops.type = 'purchase'), 0) AS purchases
          FROM (${union}) ops ${where}`,
-        [id, OFFSET_METHOD],
+        [id, NON_CASH_METHODS],
       ),
       this.dataSource.query(
         `SELECT ops.*, u.username, u.surname
          FROM (${union}) ops LEFT JOIN "user" u ON u.id = ops.user_id
          ${where}
          ORDER BY ops.date DESC, ops.id DESC LIMIT $3 OFFSET $4`,
-        [id, OFFSET_METHOD, limit, (page - 1) * limit],
+        [id, NON_CASH_METHODS, limit, (page - 1) * limit],
       ),
     ]);
 
@@ -247,9 +253,14 @@ export class CustomerProfileService {
         const ids = rows.filter((row) => row.type === key).map((row) => row.id as number);
         if (ids.length === 0) return;
         const source = SOURCES[key];
+        // Savdo qatorida: qancha qaytarilgani va alohida shu tovar uchun qancha to'langani ("310 metrdan 10 metri").
+        const saleExtra = key === 'sale'
+          ? `, (SELECT coalesce(sum(ri.quantity), 0) FROM return_item ri WHERE ri."saleItemId" = i.id) AS returned,
+               (SELECT coalesce(sum(pa.quantity), 0) FROM sale_payment_item pa WHERE pa."saleItemId" = i.id) AS paid_qty`
+          : '';
         const [itemRows, paymentRows]: [Row[], Row[]] = await Promise.all([
           this.dataSource.query(
-            `SELECT i.${source.itemKey} AS op_id, pr.id AS product_id, pr.name, pr.unit, i.quantity, i.price
+            `SELECT i.${source.itemKey} AS op_id, i.id AS item_id, pr.id AS product_id, pr.name, pr.unit, i.quantity, i.price${saleExtra}
              FROM ${source.itemTable} i LEFT JOIN product pr ON pr.id = i."productId"
              WHERE i.${source.itemKey} = ANY($1::int[]) ORDER BY i.id`, [ids]),
           this.dataSource.query(
@@ -302,12 +313,15 @@ export class CustomerProfileService {
             ? { id: row.user_id as number, username: row.username as string, surname: row.surname as string }
             : null,
           items: (items.get(bucket) ?? []).map((item) => ({
+            id: item.item_id as number,
             productId: (item.product_id as number | null) ?? null,
             name: (item.name as string | null) ?? null,
             unit: (item.unit as string | null) ?? null,
             quantity: qty(item.quantity),
             price: money(item.price),
             amount: Math.round(num(item.quantity) * num(item.price)),
+            // Faqat savdoda: qaytarilgani va alohida shu tovar uchun to'langani.
+            ...(row.type === 'sale' ? { returned: qty(item.returned), paid: qty(item.paid_qty) } : {}),
           })),
           payments: (payments.get(bucket) ?? []).map((payment) => ({
             method: payment.method as string,

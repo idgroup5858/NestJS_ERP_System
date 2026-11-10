@@ -4,6 +4,7 @@ import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { ChangeSaleCustomerDto } from './dto/change-sale-customer.dto';
 import { AddSaleMasterFeeDto } from './dto/add-sale-master-fee.dto';
+import { PaySaleItemsDto } from './dto/pay-sale-items.dto';
 
 @Controller('sale')
 export class SaleController {
@@ -134,6 +135,12 @@ export class SaleController {
   @Patch('customer/:id')
   changeCustomer(@Param('id') id: string, @Body() dto: ChangeSaleCustomerDto) {
     return this.saleService.changeCustomer(+id, dto);
+  }
+
+  /** Qarzni aniq tovarlar bo'yicha to'lash ("310 metrdan 10 metri uchun"): pul bilan yoki balansdan. */
+  @Post('pay-items/:id')
+  payItems(@Param('id') id: string, @Body() dto: PaySaleItemsDto) {
+    return this.saleService.payItems(+id, dto);
   }
 
   /** Savdodan keyin usta xizmatini qo'shish (usta kech kelgan bo'lsa); hisob kassadagidek. */

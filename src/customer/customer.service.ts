@@ -58,10 +58,8 @@ export class CustomerService {
     const data = this.prepare(createCustomerDto);
     await this.assertPhoneFree(data.phone);
 
-    const customer = this.customerRepository.create({
-      ...data,
-      balance: Number(createCustomerDto.balance) || 0,
-    });
+    // Balans qo'lda yozilmaydi: u balans yozuvlari yig'indisi (CustomerBalanceService).
+    const customer = this.customerRepository.create(data);
 
     await this.customerRepository.save(customer);
     return customer;
@@ -272,7 +270,6 @@ async findAllPagSearch(page: number, limit: number, search?: string, type?: stri
     await this.assertPhoneFree(data.phone, id);
 
     Object.assign(checkCustomer, data);
-    if (updateCustomerDto.balance !== undefined) checkCustomer.balance = Number(updateCustomerDto.balance) || 0;
     await this.customerRepository.save(checkCustomer)
 
     return checkCustomer;

@@ -6,11 +6,15 @@ import { AddSaleMasterFeeDto } from './dto/add-sale-master-fee.dto';
 import { SaleListFilter } from './dto/sale-list-query.dto';
 import { Sale } from './entities/sale.entity';
 import { SaleMasterFee } from './entities/sale-master-fee.entity';
+import { SalePaymentItem } from './entities/sale-payment-item.entity';
+import { PaySaleItemsDto } from './dto/pay-sale-items.dto';
+import { SaleItem } from 'src/sale_items/entities/sale_item.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Brackets, Repository } from 'typeorm';
 import { SaleItemsService } from 'src/sale_items/sale_items.service';
 import { PaymentService } from 'src/payment/payment.service';
-import { CONTRACT_METHOD, OFFSET_METHOD } from 'src/payment/payment-methods';
+import { BALANCE_PAY_METHOD, CONTRACT_METHOD, DEBT_METHOD, isNonCashMethod } from 'src/payment/payment-methods';
+import { CustomerBalanceService } from 'src/customer/customer-balance.service';
 import { ContractService } from 'src/contract/contract.service';
 import { StockService } from 'src/stock/stock.service';
 import { TelegramBotService } from 'src/telegram/telegram-bot.service';
@@ -27,9 +31,6 @@ const MAX_SALE_DISCOUNT_PERCENT = 20;
 /** Bir savdodagi usta xizmatlari soni chegarasi. */
 const MAX_MASTER_FEES = 20;
 
-/** Kassadagi "В долг": to'lov yozilmaydi, summa savdo qarziga qo'shiladi. */
-const DEBT_METHOD = 'В долг';
-
 @Injectable()
 export class SaleService {
 
@@ -41,6 +42,7 @@ export class SaleService {
     private readonly stockService: StockService,
     private readonly telegramBot: TelegramBotService,
     private readonly contractService: ContractService,
+    private readonly balanceService: CustomerBalanceService,
 
   ) { }
 
@@ -70,11 +72,32 @@ export class SaleService {
 
     // To'lov savdo summasidan oshmasligi kerak. Kassa va server summani har xil hisoblasa (masalan, server eski
     // versiyada qolib, usta xizmatidan kompaniya ulushini bilmasa) — savdo noto'g'ri yozilmasdan rad etiladi.
-    const paid = (createSaleDto.payments ?? []).reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+    const payments = createSaleDto.payments ?? [];
+    const paid = payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
     if (paid > total - discount) {
       throw new BadRequestException(
         `Оплата (${paid.toLocaleString('ru-RU')}) больше суммы продажи (${(total - discount).toLocaleString('ru-RU')}) — обновите страницу и оформите продажу заново`,
       );
+    }
+
+    // "С баланса": savdoning bir qismi (yoki hammasi) mijozning balansidan. Kontragent majburiy, balans yetishi kerak.
+    // Boshqa "pul emas" usullar (zachyot, "На баланс") kassada tanlanmaydi.
+    const isBalance = (method?: string) => method?.trim() === BALANCE_PAY_METHOD;
+    if (payments.some((payment) => isNonCashMethod(payment.method) && !isBalance(payment.method))) {
+      throw new BadRequestException('Этот способ оплаты нельзя выбрать в кассе');
+    }
+    const balancePaid = payments
+      .filter((payment) => isBalance(payment.method))
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+    if (balancePaid > 0) {
+      if (!createSaleDto.customer_id) throw new BadRequestException('Для оплаты с баланса выберите контрагента');
+      if (!Number.isInteger(balancePaid)) throw new BadRequestException('Сумма оплаты с баланса должна быть целым числом');
+      const balance = await this.balanceService.balanceOf(createSaleDto.customer_id);
+      if (balancePaid > balance) {
+        throw new BadRequestException(
+          `На балансе клиента ${balance.toLocaleString('ru-RU')} сум — меньше суммы оплаты с баланса (${balancePaid.toLocaleString('ru-RU')})`,
+        );
+      }
     }
 
     // Sotuv tranzaksiyasiz yoziladi, shuning uchun qoldiq keyinroq topilmasa
@@ -89,6 +112,22 @@ export class SaleService {
     });
 
     await this.saleRepository.save(sale);
+
+    // Balansdan to'lov — qulf ostida qayta tekshiriladi (shu orada balans ishlatilgan bo'lishi mumkin).
+    // O'tmasa savdoning boshqa qismlari hali yozilmagan: savdo o'chiriladi, kassir qayta urinadi.
+    if (balancePaid > 0) {
+      try {
+        await this.saleRepository.manager.transaction((em) => this.balanceService.spendOnSale(em, {
+          customerId: createSaleDto.customer_id,
+          saleId: sale.id,
+          amount: balancePaid,
+          userId: createSaleDto.user_id,
+        }));
+      } catch (error) {
+        await this.saleRepository.delete(sale.id);
+        throw error;
+      }
+    }
 
     if (masterFees.length > 0) {
       await this.saleRepository.manager.save(
@@ -109,7 +148,9 @@ export class SaleService {
       });
     }
 
-    for (const payment of createSaleDto.payments) {
+    for (const payment of payments) {
+      // "С баланса" yuqorida balans yozuvi bilan birga yozildi.
+      if (isBalance(payment.method)) continue;
       await this.paymentService.create({
         ...payment,
         sale_id: sale.id
@@ -373,18 +414,32 @@ async findAllPagSearch(page: number, limit: number, filter: SaleListFilter = {})
 
     const sale = await this.saleRepository.findOne({
       where: { id },
-      relations: ["items", "items.product", "items.warehouse", "items.returnItems", "payments", "customer", "user", "returns"],
+      relations: [
+        "items", "items.product", "items.warehouse", "items.returnItems", "items.paymentAllocations",
+        "payments", "payments.allocations", "payments.allocations.saleItem", "customer", "user", "returns",
+      ],
       order: { items: { id: "ASC" }, payments: { id: "ASC" } }
     });
     if (!sale) throw new NotFoundException("Не найден Прдоажа");
 
-    const { items, returns, ...rest } = sale;
+    const { items, returns, payments, ...rest } = sale;
 
     return {
       ...rest,
-      items: items.map(({ returnItems, ...item }) => ({
+      // `returned` — qaytarilgani, `paid` — alohida shu tovar uchun to'langani ("310 metrdan 10 metri uchun").
+      items: items.map(({ returnItems, paymentAllocations, ...item }) => ({
         ...item,
-        returned: roundQuantity(returnItems.reduce((sum, r) => sum + r.quantity, 0))
+        returned: roundQuantity(returnItems.reduce((sum, r) => sum + r.quantity, 0)),
+        paid: roundQuantity(paymentAllocations.reduce((sum, a) => sum + a.quantity, 0)),
+      })),
+      // To'lov aniq tovarlar uchun bo'lsa — `allocations`: qaysi qator, qancha miqdor va summa.
+      payments: payments.map(({ allocations, ...payment }) => ({
+        ...payment,
+        allocations: (allocations ?? []).map((allocation) => ({
+          saleItemId: allocation.saleItem?.id ?? null,
+          quantity: allocation.quantity,
+          amount: allocation.amount,
+        })),
       })),
       returnedTotal: returns.reduce((sum, r) => sum + r.total - r.discount, 0),
       // Savdoga bog'langan shartnoma (bo'lmasa `null`): ekranda ko'rsatiladi, "По договору" ga o'tkazish uchun kerak.
@@ -714,6 +769,9 @@ async findAllPagSearch(page: number, limit: number, filter: SaleListFilter = {})
       }
 
       if (customerChanges) {
+        // Balans mijozga bog'liq: eski mijoz balansidan to'langan qism bekor qilinadi (pul unga qaytadi, savdoda qarz
+        // qoladi), shu savdodan qaytarishlar balansga yozilgan bo'lsa — yangi kontragentga o'tadi.
+        await this.balanceService.followSaleCustomer(em, id, sale.customer?.id ?? null, customer!.id);
         await em.update(Sale, { id }, { customer: { id: customer!.id } as Customer });
         await em.createQueryBuilder()
           .update(Return)
@@ -727,7 +785,10 @@ async findAllPagSearch(page: number, limit: number, filter: SaleListFilter = {})
         if (await em.exists(Contract, { where: { sale: { id } } })) {
           throw new BadRequestException('По этой продаже уже есть договор');
         }
-        const paid = sale.payments.reduce((sum, payment) => sum + payment.amount, 0);
+        // Kontragent almashgan bo'lsa "С баланса" to'lovlari yuqorida bekor qilindi — ular hisobga olinmaydi.
+        const paid = sale.payments
+          .filter((payment) => !(customerChanges && payment.method.trim() === BALANCE_PAY_METHOD))
+          .reduce((sum, payment) => sum + payment.amount, 0);
         if (Math.max(0, sale.total - sale.discount - paid) <= 0) {
           throw new BadRequestException('Продажа полностью оплачена — оформить её по договору нельзя');
         }
@@ -737,6 +798,88 @@ async findAllPagSearch(page: number, limit: number, filter: SaleListFilter = {})
           await em.save(em.create(Payment, { sale: { id } as Sale, method: CONTRACT_METHOD, amount: 0 }));
         }
         await this.contractService.openForSale(em, id, true);
+      }
+    });
+
+    return this.findDetail(id);
+  }
+
+  /**
+   * Qarzni aniq tovarlar bo'yicha to'lash: "310 metrdan 10 metri uchun". Har bir qatordan ko'pi bilan to'lanmagan
+   * qismi (sotilgan − qaytarilgan − avval shu qator uchun to'langan). Summa — savdodagi narx, savdo chegirmasi
+   * mutanosib (qaytarishdagi qoida bilan bir xil), ko'pi bilan qolgan qarz. To'lov pul bilan (odatiy "В долг" usuli)
+   * yoki kontragent balansidan ("С баланса"). To'lov va qatorlarga bo'linishi bitta tranzaksiyada.
+   * Yangilangan tafsilotni qaytaradi.
+   */
+  async payItems(id: number, dto: PaySaleItemsDto) {
+    const method = dto.method?.trim() || DEBT_METHOD;
+    if (!dto.from_balance && (method === CONTRACT_METHOD || isNonCashMethod(method))) {
+      throw new BadRequestException('Этот способ оплаты нельзя выбрать для оплаты долга');
+    }
+
+    await this.saleRepository.manager.transaction(async (em) => {
+      // Bir vaqtda ikki to'lov bitta qatorni ortiqcha to'lab yubormasligi uchun savdo qulflanadi.
+      const locked: unknown[] = await em.query('SELECT id FROM sale WHERE id = $1 FOR UPDATE', [id]);
+      if (locked.length === 0) throw new NotFoundException('Продажа не найдена');
+      const sale = await em.findOne(Sale, {
+        where: { id },
+        relations: { items: { product: true, returnItems: true, paymentAllocations: true }, payments: true, customer: true },
+      });
+      if (!sale) throw new NotFoundException('Продажа не найдена');
+
+      const requested = new Map<number, number>();
+      for (const item of dto.items) {
+        if (roundQuantity(item.quantity) !== item.quantity) throw new BadRequestException('Неверное количество');
+        requested.set(item.sale_item_id, roundQuantity((requested.get(item.sale_item_id) ?? 0) + item.quantity));
+      }
+
+      const lines: { saleItem: SaleItem; quantity: number; gross: number }[] = [];
+      for (const [saleItemId, quantity] of requested) {
+        const saleItem = sale.items.find((item) => item.id === saleItemId);
+        if (!saleItem) throw new BadRequestException('Товар не найден в этой продаже');
+        const returned = saleItem.returnItems.reduce((sum, r) => sum + r.quantity, 0);
+        const paid = saleItem.paymentAllocations.reduce((sum, a) => sum + a.quantity, 0);
+        const unpaid = Math.max(0, roundQuantity(saleItem.quantity - returned - paid));
+        if (quantity > unpaid) {
+          throw new BadRequestException(`«${saleItem.product?.name ?? `#${saleItem.id}`}»: не оплачено только ${unpaid}`);
+        }
+        lines.push({ saleItem, quantity, gross: quantity * saleItem.price });
+      }
+
+      const net = sale.total - sale.discount;
+      const debt = Math.max(0, net - sale.payments.reduce((sum, payment) => sum + payment.amount, 0));
+      if (debt <= 0) throw new BadRequestException('По этой продаже долга нет');
+
+      const gross = lines.reduce((sum, line) => sum + line.gross, 0);
+      const value = sale.total > 0 ? Math.round(gross * net / sale.total) : 0;
+      // Avval umumiy qarzdan to'langan bo'lsa, tovarlar summasi qolgan qarzdan oshishi mumkin — qarzgacha.
+      const amount = Math.min(value, debt);
+      if (amount <= 0) throw new BadRequestException('Сумма за выбранные товары равна нулю');
+
+      let payment: Payment;
+      if (dto.from_balance) {
+        if (!sale.customer) throw new BadRequestException('В продаже нет контрагента — оплатить с баланса нельзя');
+        payment = await this.balanceService.spendOnSale(em, {
+          customerId: sale.customer.id,
+          saleId: id,
+          amount,
+          userId: dto.user_id,
+        });
+      } else {
+        payment = await em.save(em.create(Payment, { sale: { id } as Sale, amount, method }));
+      }
+
+      // Summa qatorlarga ulushiga qarab bo'linadi; yaxlitlash qoldig'i oxirgi qatorga.
+      let left = amount;
+      for (const [index, line] of lines.entries()) {
+        const part = index === lines.length - 1 ? left : Math.round(line.gross * amount / gross);
+        left -= part;
+        await em.save(em.create(SalePaymentItem, {
+          payment: { id: payment.id } as Payment,
+          saleItem: { id: line.saleItem.id } as SaleItem,
+          quantity: line.quantity,
+          amount: part,
+        }));
       }
     });
 
@@ -755,7 +898,7 @@ async findAllPagSearch(page: number, limit: number, filter: SaleListFilter = {})
       { master_id: dto.master_id, amount: dto.amount, company_amount: dto.company_amount, note: dto.note },
     ]);
     const method = dto.method?.trim() || DEBT_METHOD;
-    if (method === CONTRACT_METHOD || method === OFFSET_METHOD) {
+    if (method === CONTRACT_METHOD || isNonCashMethod(method)) {
       throw new BadRequestException('Этот способ оплаты нельзя выбрать для услуги мастера');
     }
 

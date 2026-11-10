@@ -41,9 +41,6 @@ export class CreateCustomerDto {
     @MaxLength(32)
     phone?: string;
 
-    @IsOptional()
-    balance?: number;
-
     // ---- tashkilot ma'lumotlari / bank rekvizitlari (hammasi ixtiyoriy)
 
     @IsOptional()

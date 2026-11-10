@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { isNonCashMethod } from './payment-methods';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,6 +23,12 @@ export class  PaymentService {
 
 
     async create(dto: CreatePaymentDto) {
+
+      // «Зачёт возврата», «С баланса», «На баланс» faqat o'z jarayoni orqali yoziladi (qaytarish, mijoz balansi):
+      // aks holda balans yozuvisiz to'lov paydo bo'lib, qarz pul kelmasdan yopilib qolardi.
+      if (isNonCashMethod(dto.method)) {
+        throw new BadRequestException('Этот способ оплаты нельзя добавить вручную');
+      }
 
       const pay = new Payment();
 
@@ -67,6 +74,9 @@ export class  PaymentService {
   }
 
   async createReturn(createPaymentDto: CreatePaymentDto) {
+    if (isNonCashMethod(createPaymentDto.method)) {
+      throw new BadRequestException('Этот способ оплаты нельзя добавить вручную');
+    }
     const pay = this.paymentRepository.create({
       ...createPaymentDto,
       returns:{id:createPaymentDto.return_id}
@@ -188,6 +198,10 @@ export class  PaymentService {
     const checkPayment = await this.paymentRepository.findOneBy({ id });
     if (!checkPayment) throw new NotFoundException("Не найден Плат");
 
+    // Balans va qaytarish to'lovlari balans yozuvi bilan bog'langan — alohida tahrirlansa ular bir-biriga mos kelmay qoladi.
+    if (isNonCashMethod(checkPayment.method) || isNonCashMethod(updatePaymentkDto.method)) {
+      throw new BadRequestException('Этот платёж нельзя изменить вручную');
+    }
 
     const payment = await this.paymentRepository.preload({
       id,
