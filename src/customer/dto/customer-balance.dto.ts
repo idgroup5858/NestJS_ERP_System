@@ -1,5 +1,5 @@
 import { Transform, Type } from "class-transformer";
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
+import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -57,6 +57,24 @@ export class BalancePayDto {
     @Type(() => Number)
     @IsInt()
     user_id?: number;
+}
+
+/**
+ * Mijoz qarz uchun pul berdi. Pul qarzni yopadi (`sale_id` — faqat shu savdo, bo'lmasa eng eski qarzdan boshlab),
+ * ortgani (qaytim) `keep_change` bo'lsa (standart) — mijoz balansiga, aks holda qaytim qo'lga berilgan hisoblanadi.
+ */
+export class AcceptPaymentDto extends BalanceMoneyDto {
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    sale_id?: number;
+
+    /** Qaytim balansga yozilsinmi (standart: ha). `false` — qaytim mijozga naqd berildi, faqat qarz yopiladi. */
+    @IsOptional()
+    @IsBoolean()
+    keep_change?: boolean;
 }
 
 export const BALANCE_HISTORY_MAX_LIMIT = 100;

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { CustomerBalanceService } from './customer-balance.service';
-import { BalanceHistoryQueryDto, BalanceMoneyDto, BalancePayDto } from './dto/customer-balance.dto';
+import { AcceptPaymentDto, BalanceHistoryQueryDto, BalanceMoneyDto, BalancePayDto } from './dto/customer-balance.dto';
 
 /** Mijoz balansi: holati va tarixi, to'ldirish, pulni qaytarish, qarzni balansdan yopish. */
 @Controller('customer/balance')
@@ -23,6 +23,15 @@ export class CustomerBalanceController {
   @Post(':id/withdraw')
   withdraw(@Param('id', ParseIntPipe) id: number, @Body() dto: BalanceMoneyDto) {
     return this.balanceService.withdraw(id, dto);
+  }
+
+  /**
+   * Mijoz qarz uchun pul berdi: qarz yopiladi (`sale_id` — bitta savdo, bo'lmasa eng eski qarzdan), ortgani
+   * (qaytim) — balansga (`keep_change: false` bo'lsa — qaytim qo'lga berilgan).
+   */
+  @Post(':id/accept')
+  accept(@Param('id', ParseIntPipe) id: number, @Body() dto: AcceptPaymentDto) {
+    return this.balanceService.acceptPayment(id, dto);
   }
 
   /** Qarzni balansdan yopish: `sale_id` — bitta savdo, bo'lmasa eng eski qarzdan boshlab. */

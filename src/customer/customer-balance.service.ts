@@ -14,7 +14,7 @@ import { User } from 'src/user/entities/user.entity';
 import { TelegramBotService } from 'src/telegram/telegram-bot.service';
 import { Customer } from './entities/customer.entity';
 import { BalanceEntryType, CustomerBalanceEntry } from './entities/customer-balance-entry.entity';
-import { BALANCE_HISTORY_MAX_LIMIT, BalanceMoneyDto, BalancePayDto } from './dto/customer-balance.dto';
+import { AcceptPaymentDto, BALANCE_HISTORY_MAX_LIMIT, BalanceMoneyDto, BalancePayDto } from './dto/customer-balance.dto';
 
 type Row = Record<string, unknown>;
 
@@ -316,26 +316,11 @@ export class CustomerBalanceService implements OnModuleInit {
         throw new BadRequestException(`На балансе клиента только ${fmt(balance)} сум`);
       }
 
-      const sales: Row[] = await em.query(
-        `SELECT s.id, s."customerId" AS customer_id,
-                s.total - s.discount - coalesce((SELECT sum(p.amount) FROM payment p WHERE p."saleId" = s.id), 0) AS debt
-           FROM sale s
-          WHERE ${dto.sale_id ? 's.id = $1' : 's."customerId" = $1'}
-          ORDER BY s.date, s.id`,
-        [dto.sale_id ?? customerId],
-      );
-      if (dto.sale_id) {
-        const sale = sales[0];
-        if (!sale) throw new NotFoundException('Продажа не найдена');
-        if (sale.customer_id !== customerId) throw new BadRequestException('Эта продажа другого контрагента');
-        if (money(sale.debt) <= 0) throw new BadRequestException('По этой продаже долга нет');
-        if (dto.amount !== undefined && dto.amount > money(sale.debt)) {
-          throw new BadRequestException('Сумма больше остатка долга');
-        }
-      }
-
-      const debts = sales.filter((sale) => money(sale.debt) > 0);
+      const debts = await this.debtSales(em, customerId, dto.sale_id);
       if (debts.length === 0) throw new BadRequestException('У клиента нет долгов');
+      if (dto.sale_id && dto.amount !== undefined && dto.amount > money(debts[0].debt)) {
+        throw new BadRequestException('Сумма больше остатка долга');
+      }
 
       const userId = await this.actorId(em, dto.user_id);
       let budget = Math.min(balance, dto.amount ?? balance);
@@ -354,7 +339,89 @@ export class CustomerBalanceService implements OnModuleInit {
     return result;
   }
 
+  /**
+   * Mijoz qarz uchun pul berdi (masalan qarz 500 000, berdi 1 000 000). Pul qarzni yopadi: `sale_id` — faqat shu
+   * savdo, bo'lmasa eng eski qarzdan boshlab; har bir savdoga shu usuldagi (naqd, karta …) to'lov yoziladi.
+   * Ortgan pul (qaytim) `keep_change` bo'lsa (standart) — mijoz balansiga, aks holda qaytim qo'lga berilgan.
+   * Qarz bo'lmasa va qaytim balansga yozilsa — butun summa balansga tushadi.
+   * Qaytaradi: qaysi savdoga qancha, balansga qancha tushgani va yangi balans.
+   */
+  async acceptPayment(customerId: number, dto: AcceptPaymentDto) {
+    assertCashMethod(dto.method);
+    const keepChange = dto.keep_change !== false;
+
+    const { result, depositId } = await this.dataSource.transaction(async (em) => {
+      const balance = await this.lock(em, customerId);
+      const debts = await this.debtSales(em, customerId, dto.sale_id);
+      if (debts.length === 0 && !keepChange) throw new BadRequestException('У клиента нет долгов');
+
+      const userId = await this.actorId(em, dto.user_id);
+      let budget = dto.amount;
+      const paid: { saleId: number; amount: number }[] = [];
+      for (const sale of debts) {
+        if (budget <= 0) break;
+        const amount = Math.min(money(sale.debt), budget);
+        await em.save(em.create(Payment, { sale: { id: sale.id as number } as Sale, amount, method: dto.method }));
+        paid.push({ saleId: sale.id as number, amount });
+        budget -= amount;
+      }
+
+      let deposited = 0;
+      let entryId: number | null = null;
+      if (budget > 0 && keepChange) {
+        const ids = paid.map((item) => `#${item.saleId}`).join(', ');
+        const entry = await this.addEntry(em, {
+          customerId,
+          amount: budget,
+          type: 'deposit',
+          method: dto.method,
+          userId,
+          note: dto.note?.trim() || (ids ? `Сдача с оплаты долга (продажа ${ids})` : null),
+        });
+        deposited = budget;
+        entryId = entry.id;
+      }
+
+      return {
+        depositId: entryId,
+        result: {
+          paid: paid.reduce((sum, item) => sum + item.amount, 0),
+          sales: paid,
+          deposited,
+          // Qaytim qo'lga berilgan bo'lsa — qancha.
+          change: keepChange ? 0 : budget,
+          balance: balance + deposited,
+        },
+      };
+    });
+
+    if (depositId) this.telegramBot.notifyBalance(depositId);
+    return result;
+  }
+
   // ------------------------------------------------------------------ yordamchi
+
+  /**
+   * Qarzi qolgan savdolar (eskisi birinchi): `saleId` berilsa — faqat shu savdo (u shu mijozniki bo'lishi va qarzi
+   * qolgan bo'lishi shart), aks holda mijozning barcha qarzli savdolari.
+   */
+  private async debtSales(em: EntityManager, customerId: number, saleId?: number) {
+    const sales: Row[] = await em.query(
+      `SELECT s.id, s."customerId" AS customer_id,
+              s.total - s.discount - coalesce((SELECT sum(p.amount) FROM payment p WHERE p."saleId" = s.id), 0) AS debt
+         FROM sale s
+        WHERE ${saleId ? 's.id = $1' : 's."customerId" = $1'}
+        ORDER BY s.date, s.id`,
+      [saleId ?? customerId],
+    );
+    if (saleId) {
+      const sale = sales[0];
+      if (!sale) throw new NotFoundException('Продажа не найдена');
+      if (sale.customer_id !== customerId) throw new BadRequestException('Эта продажа другого контрагента');
+      if (money(sale.debt) <= 0) throw new BadRequestException('По этой продаже долга нет');
+    }
+    return sales.filter((sale) => money(sale.debt) > 0);
+  }
 
   private async requireCustomer(id: number) {
     if (!(await this.dataSource.manager.exists(Customer, { where: { id } }))) {
